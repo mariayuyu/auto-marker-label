@@ -79,8 +79,19 @@ def plot_metrics(csv_path, save=False, outdir='plots'):
     for key, val in params.items():
         print(f"  {key}: {val}")
 
+    # --- Best Validation Loss Info ---
+    min_val_loss = min(val_losses)
+    min_index = val_losses.index(min_val_loss)
+    best_epoch = epochs[min_index]
+    best_accuracy = val_accuracies[min_index] * 100
+
+    print(f"\nBest Model:")
+    print(f"  Epoch: {best_epoch}")
+    print(f"  Validation Loss: {min_val_loss:.4f}")
+    print(f"  Corresponding Accuracy: {best_accuracy:.2f}%")
+
 
 # Main
 if __name__ == '__main__':
-    csv_file = 'metrics.csv'  # Replace with your file name
+    csv_file = 'metrics.csv'  
     plot_metrics(csv_file, save=True)
