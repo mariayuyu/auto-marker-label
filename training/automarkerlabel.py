@@ -20,6 +20,10 @@ from scipy import stats
 from scipy.optimize import linear_sum_assignment  
 from scipy.interpolate import CubicSpline
 from sklearn.utils.extmath import weighted_mode
+
+from sklearn.model_selection import train_test_split
+import csv
+
 from ezc3d import c3d
 import h5py
 import random
@@ -45,6 +49,8 @@ FCnodes = 128
 lr = 0.078
 momentum = 0.65
 
+# Path to CSV file for metrics
+csv_path = "metrics.csv"
 
 # --------------------------------------------------------------------------- #
 # ---------------------------- MAIN FUNCTIONS ------------------------------- #
@@ -213,27 +219,40 @@ def trainAlgorithm(savepath,datapath,markersetpath,fs,num_epochs=10,prevModel=No
        
         print('Loaded simulated trajectory training data')
     else:
-        # Load labelled c3d files for training
-        filelist = glob.glob(os.path.join(datapath,'**', '*.c3d'))
-        print(filelist)
-        data_segs, windowIdx = import_labelled_c3ds(filelist,markers,
-                                                        alignMkR,alignMkL,windowSize)
-    
-        max_len = max([x[3]-x[2] for x in windowIdx])
+        # Get subject folders
+        subject_folders = [os.path.join(datapath, d) for d in os.listdir(datapath)
+                        if os.path.isdir(os.path.join(datapath, d))]
+
+        # Split subjects
+        train_subjects, val_subjects = train_test_split(subject_folders, test_size=0.15, random_state=42)
+        print("Folders used for training:", train_subjects)
+        print("Folders used for validation:", val_subjects)
+        # Get C3D files from each subject
+        train_files = sum([glob.glob(os.path.join(subj, '*.c3d')) for subj in train_subjects], [])
+        val_files = sum([glob.glob(os.path.join(subj, '*.c3d')) for subj in val_subjects], [])
+
+        # Step 2: Import training and validation data separately
+        train_data_segs, train_windowIdx = import_labelled_c3ds(train_files, markers, alignMkR, alignMkL, windowSize)
+        val_data_segs, val_windowIdx     = import_labelled_c3ds(val_files, markers, alignMkR, alignMkL, windowSize)
+
+        max_len = max([x[3]-x[2] for x in train_windowIdx])
         
-        print('Loaded c3ds files for training data')
+        print(f"Loaded {len(train_files)} training files and {len(val_files)} validation files.")
     
     # Calculate values to use to scale neural network inputs and distances between
     # markers on same body segment to use for label verification
-    scaleVals, segdists = get_trainingVals(data_segs,uniqueSegs,segID)    
+    scaleVals, segdists = get_trainingVals(train_data_segs,uniqueSegs,segID)    
     
-    max_len = max([len(x) for x in data_segs])
+    max_len = max([len(x) for x in train_data_segs])
     training_vals = {'segdists' : segdists, 'scaleVals' : scaleVals,'max_len' : max_len}
+
     with open(os.path.join(savepath,'trainingvals_' + date.today().strftime("%Y-%m-%d") + '.pickle'),'wb') as f:
         pickle.dump(training_vals,f)
     
-    net, running_loss = train_nn(data_segs,num_mks,max_len,windowIdx,
-                                        scaleVals,num_epochs,prevModel,tempCkpt,contFromTemp)
+
+    net, running_loss, val_loss, val_acc = train_nn(train_data_segs,num_mks,max_len,train_windowIdx,
+                                        scaleVals,num_epochs,prevModel,tempCkpt,contFromTemp,
+                                        val_data_segs,val_windowIdx, bestModelPath="best_model.ckpt")
         
     with open(os.path.join(savepath,'training_stats_' + date.today().strftime("%Y-%m-%d") + '.pickle'),'wb') as f:
         pickle.dump(running_loss,f)
@@ -241,6 +260,41 @@ def trainAlgorithm(savepath,datapath,markersetpath,fs,num_epochs=10,prevModel=No
         
     print('Model saved to %s' % os.path.realpath(savepath))
     print('Algorithm trained in %s' % (time.time() - t0))
+
+    # ----------- SAVING METRICS ------------
+    # Calculate average training loss per epoch 
+    batches_per_epoch = len(running_loss) // len(val_loss)
+    avg_train_losses = [sum(running_loss[i * batches_per_epoch:(i + 1) * batches_per_epoch]) / batches_per_epoch
+                        for i in range(len(val_loss))]
+
+    # Write the metrics to CSV
+    with open(csv_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+
+        # Write parameters as metadata
+        writer.writerow(["# Training Parameters"])
+        writer.writerow(["Filter Cutoff (Hz)", filtfreq])
+        writer.writerow(["Batch Size", batch_size])
+        writer.writerow(["LSTM Cells", nLSTMcells])
+        writer.writerow(["LSTM Layers", nLSTMlayers])
+        writer.writerow(["LSTM Dropout", LSTMdropout])
+        writer.writerow(["FC Nodes", FCnodes])
+        writer.writerow(["Learning Rate", lr])
+        writer.writerow(["Momentum", momentum])
+        writer.writerow([])  # Blank line
+
+        writer.writerow(['Epoch', 'Train_Loss', 'Val_Loss', 'Val_Accuracy'])  # Header
+
+        for epoch in range(len(val_loss)):
+            writer.writerow([
+                epoch + 1,
+                avg_train_losses[epoch],
+                val_loss[epoch],
+                val_acc[epoch]
+            ])
+
+    print(f"Metrics saved to {csv_path}")
+
 
 
 def transferLearning(savepath,datapath,modelpath,trainvalpath,markersetpath,
@@ -892,7 +946,8 @@ class Net(nn.Module):
         return out
 
 def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
-             tempCkpt=None,contFromTemp=False):
+             tempCkpt=None,contFromTemp=False,
+             val_data_segs=None,val_windowIdx=None, bestModelPath=None):
     '''
     Train the neural network. 
     Will use GPU if available.
@@ -939,6 +994,15 @@ def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
     traindata = markerdata(data_segs,num_mks,windowIdx,scaleVals)
     trainloader = torch.utils.data.DataLoader(traindata,batch_size=batch_size,
                                               shuffle=True,collate_fn=pad_collate)
+
+    # Create validation dataset and loader (if provided)
+    if val_data_segs is not None and val_windowIdx is not None:
+        valdata = markerdata(val_data_segs, num_mks, val_windowIdx, scaleVals)
+        valloader = torch.utils.data.DataLoader(valdata, batch_size=batch_size,
+                                                shuffle=False, collate_fn=pad_collate)
+    else:
+        valloader = None
+
     # Create neural net
     net = Net(max_len,num_mks).to(device)
     
@@ -963,9 +1027,19 @@ def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
         epoch0 = 0
         running_loss = []
         
+    val_losses = []
+    val_accuracies = []
+    best_val_loss = float('inf')    
+
+    # Early Stop
+    patience = 5  
+    epochs_no_improve = 0
+    early_stop = False
+
     # Train Network
     total_step = len(trainloader)
     for epoch in range(epoch0,num_epochs):
+        net.train()
         for i, (data, labels, trials, data_lens) in enumerate(trainloader):
             data = data.to(device)
             labels = torch.LongTensor(labels)
@@ -986,12 +1060,61 @@ def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
             if (i+1) % 10 == 0:
                 print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch+1,num_epochs,i+1,
                                                                          total_step,loss.item()))
+
+        # ----- VALIDATION -----
+        if valloader is not None:
+            net.eval()
+            val_loss_epoch = 0
+            correct = 0
+            total = 0
+            count = 0
+
+            with torch.no_grad():
+                for data, labels, trials, data_lens in valloader:
+                    data = data.to(device)
+                    labels = torch.LongTensor(labels).to(device)
+                        
+                    outputs = net(data, data_lens)
+                    val_loss = criterion(outputs, labels)
+                    val_loss_epoch += val_loss.item()
+
+                    _, predicted = torch.max(outputs, 1)
+                    correct += (predicted == labels).sum().item()
+                    total += labels.size(0)
+
+                    count += 1
+
+            val_loss_epoch /= count
+            val_losses.append(val_loss_epoch)
+
+            val_accuracy = correct / total
+            val_accuracies.append(val_accuracy)
+
+            print(f'>>> Validation Loss after Epoch {epoch+1}: {val_loss_epoch:.4f}')
+            print(f'>>> Accuracy after Epoch {epoch+1}: {val_accuracy:.4f}')
+
+            # Save best model so far
+            if val_loss_epoch < best_val_loss:
+                best_val_loss = val_loss_epoch
+                epochs_no_improve = 0
+                if bestModelPath is not None:
+                    torch.save(net.state_dict(), bestModelPath)
+                    print(f'>>> Best model saved (val loss: {val_loss_epoch:.4f})')
+            else:
+                epochs_no_improve += 1
+                print(f">>> No improvement for {epochs_no_improve} epoch(s)")
+
+            if epochs_no_improve >= patience:
+                print(f'\n>>> Early stopping triggered after {epoch+1} epochs (no improvement for {patience} epochs)')
+                early_stop = True
+                break
+                                                                        
         if tempCkpt is not None:
             torch.save({'epoch': epoch+1,'model_state_dict': net.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),'running_loss': running_loss,'loss' : loss,
                 'rng_state': torch.get_rng_state()},tempCkpt)
         
-    return net, running_loss
+    return net, running_loss, val_losses, val_accuracies
 
 def predict_nn(modelpath,pts,windowIdx,scaleVals,num_mks,max_len):
     '''
