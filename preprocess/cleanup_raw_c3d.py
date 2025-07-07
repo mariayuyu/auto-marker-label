@@ -7,9 +7,6 @@ import pandas
 import btk
 
 def remove_uname_markers(input_path, output_path=None):
-    import ezc3d
-    import numpy as np
-    import os
 
     c3d = ezc3d.c3d(input_path)
     marker_names = c3d['parameters']['POINT']['LABELS']['value']
