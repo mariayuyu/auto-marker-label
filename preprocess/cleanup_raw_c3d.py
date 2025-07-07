@@ -6,44 +6,45 @@ import trackpy
 import pandas
 import btk
 
-def remove_uname_markers(input_path, residual_threshold=1000, output_path=None):
-    # Load the C3D file
-    c3d = ezc3d.c3d(input_path)
+def remove_uname_markers(input_path, output_path=None):
+    import ezc3d
+    import numpy as np
+    import os
 
-    # Get marker names
+    c3d = ezc3d.c3d(input_path)
     marker_names = c3d['parameters']['POINT']['LABELS']['value']
 
-    # Identify markers to keep
+    # Identify indices to keep
     keep_indices = [i for i, name in enumerate(marker_names) if not name.lower().startswith("uname")]
+    print(f"Keeping {len(keep_indices)} of {len(marker_names)} markers")
 
-    # Filter data
-    points = c3d['data']['points'][:, keep_indices, :]
-    if 'residuals' in c3d['data']:
-        residuals = c3d['data']['residuals'][keep_indices, :]
-    else:
-        residuals = np.zeros((len(keep_indices), points.shape[2]))
+    # Filter marker data
+    c3d['data']['points'] = c3d['data']['points'][:, keep_indices, :]
 
-    # Update c3d object
-    c3d['data']['points'] = points
-    c3d['parameters']['POINT']['LABELS']['value'] = [marker_names[i] for i in keep_indices]
+    # Clean up per-marker metadata
+    for key in list(c3d['parameters']['POINT'].keys()):
+        param = c3d['parameters']['POINT'][key]
+        if isinstance(param, dict) and 'value' in param:
+            val = param['value']
+            # Trim arrays/lists matching original marker count
+            if isinstance(val, (list, np.ndarray)) and len(val) == len(marker_names):
+                c3d['parameters']['POINT'][key]['value'] = [val[i] for i in keep_indices] if isinstance(val, list) else val[keep_indices]
+            # Remove mismatched marker arrays
+            elif isinstance(val, (list, np.ndarray)) and len(val) != len(keep_indices) and len(val) != 1:
+                print(f"Removing POINT/{key} due to size mismatch")
+                del c3d['parameters']['POINT'][key]
 
-    # Optional: update other fields (like UNITS, DESCRIPTIONS) if needed
-    if 'DESCRIPTIONS' in c3d['parameters']['POINT']:
-        descriptions = c3d['parameters']['POINT']['DESCRIPTIONS']['value']
-        c3d['parameters']['POINT']['DESCRIPTIONS']['value'] = [descriptions[i] for i in keep_indices]
-
-    # Clean up invalid residuals metadata
+    # Optional cleanup
     if 'meta_points' in c3d['data']:
         del c3d['data']['meta_points']
 
-    # Save to new file
+    # Save result
     if output_path is None:
-        base, ext = os.path.splitext(input_path)
-        output_path = base + "_cleaned.c3d"
+        output_path = os.path.splitext(input_path)[0] + "_cleaned.c3d"
 
     c3d.write(output_path)
     print(f"Saved cleaned file to: {output_path}")
-
+    
 def load_c3d_markers(filepath):
     c3d = ezc3d.c3d(filepath)
     data = c3d['data']['points']  # shape: (4, N_MARKERS, N_FRAMES)
