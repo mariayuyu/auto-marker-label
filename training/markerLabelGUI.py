@@ -26,8 +26,8 @@ path=os.path.dirname(os.path.abspath(__file__)) # get current path to use as def
 # --------------------------------------------------------------------------- #
 
 # File paths
-modelpath = os.path.join(path,'data','model_2025-06-16.ckpt')
-trainvalpath = os.path.join(path,'data','trainingvals_2025-06-16.pickle')
+modelpath = os.path.join(path,'data','best_model_0705.ckpt')
+trainvalpath = os.path.join(path,'data','trainingvals_2025-07-04.pickle')
 markersetpath = os.path.join(path,'data','markers85.xml')
 
 # Other
