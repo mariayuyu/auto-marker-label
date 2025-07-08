@@ -9,7 +9,7 @@ In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This fil
 In order to run the script, change the name of the `subject` folder (e.g. Subj_50"), and `input_file` (e.g. 2-limb_02_1). 
 You can also modify the parameters for denoising and tracking. 
 
-Several packages are necessary for this script, here's how to create a virtual environment and install some packages:
+Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
 
 conda create --name labelling
 
