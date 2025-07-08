@@ -47,7 +47,7 @@ Several packages are necessary:
 * plotly==5.24.1
 * scikit-learn==1.6.1
 * scipy==1.15.1
-* torch==2.5.1
+* torch==2.7.0
 
 ### Setting up the GUI
 * Set the paths to trained model, trained values pickle file, and market set in markerLabelGUI.py.
