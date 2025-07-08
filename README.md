@@ -11,9 +11,9 @@ You can also modify the parameters for denoising and tracking.
 
 Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
 
-conda create --name labelling
+conda create --name preprocess
 
-conda activate labelling
+conda activate preprocess
 
 conda install python=3.11
 
