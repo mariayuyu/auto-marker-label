@@ -9,7 +9,19 @@ In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This fil
 In order to run the script, change the name of the `subject` folder (e.g. Subj_50"), and `input_file` (e.g. 2-limb_02_1). 
 You can also modify the parameters for denoising and tracking. 
 
-Several packages are necessary for this script: 
+Several packages are necessary for this script, here's how to create a virtual environment and install some packages:
+
+conda create --name labelling
+
+conda activate labelling
+
+conda install python=3.11
+
+conda install conda-forge::btk
+
+conda install conda-forge::trackpy
+
+Packages that are necessary:
 * ezc3d==1.5.18
 * numpy==1.26.4
 * trackpy==0.6.4
