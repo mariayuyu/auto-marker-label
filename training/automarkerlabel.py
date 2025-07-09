@@ -23,6 +23,8 @@ from sklearn.utils.extmath import weighted_mode
 
 from sklearn.model_selection import train_test_split
 import csv
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, classification_report
+
 
 from ezc3d import c3d
 import h5py
@@ -32,7 +34,7 @@ import pickle
 import warnings
 import glob
 import time
-from datetime import date
+from datetime import date, datetime
 import os
 
 
@@ -40,17 +42,48 @@ import os
 filtfreq = 6 # Cut off frequency for low-pass filter for marker trajectories
 
 # Neural network architecture parameters
-batch_size = 100
-nLSTMcells = 256
+batch_size = 128
+nLSTMcells = 128
 nLSTMlayers = 3
 LSTMdropout = .17
 FCnodes = 128
 # Learning parameters
-lr = 0.078
+lr = 0.005
 momentum = 0.65
 
-# Path to CSV file for metrics
-csv_path = "metrics.csv"
+# Create a unique filename with timestamp
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+csv_path = f"metrics_{timestamp}.csv"
+
+
+
+def compute_epoch_metrics(model, valloader, epoch, savepath):
+    if valloader is None:
+        return
+
+    device = next(model.parameters()).device  # <- Add this line
+
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for data, labels, _, data_lens in valloader:
+            data = data.to(device)
+            labels = torch.LongTensor(labels).to(device)
+            outputs = model(data, data_lens)
+            _, predicted = torch.max(outputs, 1)
+            all_preds.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
+    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
+    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+
+    print(f"\n>>> Epoch {epoch}: Precision={precision:.4f}, Recall={recall:.4f}, F1={f1:.4f}")
+
+    report_path = os.path.join(savepath, f'classification_report_epoch{epoch}.txt')
+    with open(report_path, 'w') as f:
+        f.write(classification_report(all_labels, all_preds, zero_division=0))
+
 
 # --------------------------------------------------------------------------- #
 # ---------------------------- MAIN FUNCTIONS ------------------------------- #
@@ -224,12 +257,13 @@ def trainAlgorithm(savepath,datapath,markersetpath,fs,num_epochs=10,prevModel=No
                         if os.path.isdir(os.path.join(datapath, d))]
 
         # Split subjects
-        train_subjects, val_subjects = train_test_split(subject_folders, test_size=0.15, random_state=42)
+        train_subjects, val_subjects = train_test_split(subject_folders, test_size=0.10, random_state=42)
         print("Folders used for training:", train_subjects)
         print("Folders used for validation:", val_subjects)
         # Get C3D files from each subject
         train_files = sum([glob.glob(os.path.join(subj, '*.c3d')) for subj in train_subjects], [])
         val_files = sum([glob.glob(os.path.join(subj, '*.c3d')) for subj in val_subjects], [])
+
 
         # Step 2: Import training and validation data separately
         train_data_segs, train_windowIdx = import_labelled_c3ds(train_files, markers, alignMkR, alignMkL, windowSize)
@@ -238,6 +272,7 @@ def trainAlgorithm(savepath,datapath,markersetpath,fs,num_epochs=10,prevModel=No
         max_len = max([x[3]-x[2] for x in train_windowIdx])
         
         print(f"Loaded {len(train_files)} training files and {len(val_files)} validation files.")
+        print(f"Loaded {len(train_windowIdx)} training windows and {len(val_windowIdx)} validation windows.")
     
     # Calculate values to use to scale neural network inputs and distances between
     # markers on same body segment to use for label verification
@@ -252,7 +287,9 @@ def trainAlgorithm(savepath,datapath,markersetpath,fs,num_epochs=10,prevModel=No
 
     net, running_loss, val_loss, val_acc = train_nn(train_data_segs,num_mks,max_len,train_windowIdx,
                                         scaleVals,num_epochs,prevModel,tempCkpt,contFromTemp,
-                                        val_data_segs,val_windowIdx, bestModelPath="best_model.ckpt")
+                                        val_data_segs,val_windowIdx, bestModelPath="best_model.ckpt",
+                                        after_epoch_callback=lambda model, vloader, epoch: compute_epoch_metrics(model, vloader, epoch + 1, savepath)
+                                        )
         
     with open(os.path.join(savepath,'training_stats_' + date.today().strftime("%Y-%m-%d") + '.pickle'),'wb') as f:
         pickle.dump(running_loss,f)
@@ -299,7 +336,7 @@ def trainAlgorithm(savepath,datapath,markersetpath,fs,num_epochs=10,prevModel=No
 
 def transferLearning(savepath,datapath,modelpath,trainvalpath,markersetpath,
                      num_epochs=10,windowSize=120,alignMkR=None,alignMkL=None,
-                     tempCkpt=None,contFromTemp=False):
+                     tempCkpt=None,contFromTemp=False, early_stopping_patience=5):
     '''
     Use this function to perform transfer learning. Requires a previously trained 
     model and labelled c3d files to add to training set.
@@ -346,10 +383,23 @@ def transferLearning(savepath,datapath,modelpath,trainvalpath,markersetpath,
     # Read marker set
     markers, segment, uniqueSegs, segID, _, num_mks = import_markerSet(markersetpath)
     
-    # Load c3d files
-    filelist = glob.glob(os.path.join(datapath,'*.c3d'))
-    data_segs, windowIdx = import_labelled_c3ds(filelist,markers,alignMkR,alignMkL,windowSize)
-    
+    # Load all c3d files from datapath
+    subject_folders = [os.path.join(datapath, d) for d in os.listdir(datapath)
+                       if os.path.isdir(os.path.join(datapath, d))]
+
+    # Split subjects
+    train_subjects, val_subjects = train_test_split(subject_folders, test_size=0.15, random_state=42)
+    print("Folders used for training:", train_subjects)
+    print("Folders used for validation:", val_subjects)
+
+    train_files = sum([glob.glob(os.path.join(subj, '*.c3d')) for subj in train_subjects], [])
+    val_files = sum([glob.glob(os.path.join(subj, '*.c3d')) for subj in val_subjects], [])
+
+    train_data_segs, train_windowIdx = import_labelled_c3ds(train_files, markers, alignMkR, alignMkL, windowSize)
+    val_data_segs, val_windowIdx     = import_labelled_c3ds(val_files, markers, alignMkR, alignMkL, windowSize)
+
+    print(f"Loaded {len(train_files)} training files and {len(val_files)} validation files.")
+
     # Load scale values and intra-segment distances
     with open(trainvalpath,'rb') as f:
         trainingvals = pickle.load(f)
@@ -358,8 +408,11 @@ def transferLearning(savepath,datapath,modelpath,trainvalpath,markersetpath,
     max_len = trainingvals['max_len']
     
     # Perform transfer learning
-    net, running_loss = train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,
-                                        num_epochs,modelpath,tempCkpt,contFromTemp)
+    net, running_loss, val_loss, val_acc = train_nn(train_data_segs,num_mks,max_len,train_windowIdx,
+                                        scaleVals,num_epochs,modelpath,tempCkpt,contFromTemp,
+                                        val_data_segs,val_windowIdx,
+                                        bestModelPath=os.path.join(savepath, "best_model.ckpt"),
+                                        )
       
             
     with open(os.path.join(savepath,'training_stats_plus' + str(len(filelist)) + 'trials_' + 
@@ -368,6 +421,20 @@ def transferLearning(savepath,datapath,modelpath,trainvalpath,markersetpath,
     torch.save(net.state_dict(),os.path.join(savepath,'model_plus' + str(len(filelist)) + 'trials_' +
                                               date.today().strftime("%Y-%m-%d") + '.ckpt')) 
     
+    print('Transfer learning completed in %f s' % (time.time() - t0))
+
+    # Save best validation metrics
+    batches_per_epoch = len(running_loss) // len(val_loss)
+    avg_train_losses = [sum(running_loss[i * batches_per_epoch:(i + 1) * batches_per_epoch]) / batches_per_epoch
+                        for i in range(len(val_loss))]
+
+    csv_path = os.path.join(savepath, 'transfer_metrics.csv')
+    with open(csv_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Epoch', 'Train_Loss', 'Val_Loss', 'Val_Accuracy'])
+        for epoch in range(len(val_loss)):
+            writer.writerow([epoch + 1, avg_train_losses[epoch], val_loss[epoch], val_acc[epoch]])
+    print(f"Metrics saved to {csv_path}")
     
     # Update intra-segment distances by adding in new training data
     nframes = 0
@@ -947,7 +1014,8 @@ class Net(nn.Module):
 
 def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
              tempCkpt=None,contFromTemp=False,
-             val_data_segs=None,val_windowIdx=None, bestModelPath=None):
+             val_data_segs=None,val_windowIdx=None, bestModelPath=None,
+             after_epoch_callback=None):
     '''
     Train the neural network. 
     Will use GPU if available.
@@ -993,13 +1061,13 @@ def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
     # Create dataset and torch data loader
     traindata = markerdata(data_segs,num_mks,windowIdx,scaleVals)
     trainloader = torch.utils.data.DataLoader(traindata,batch_size=batch_size,
-                                              shuffle=True,collate_fn=pad_collate)
+                                              shuffle=True,collate_fn=pad_collate, drop_last=True)
 
     # Create validation dataset and loader (if provided)
     if val_data_segs is not None and val_windowIdx is not None:
         valdata = markerdata(val_data_segs, num_mks, val_windowIdx, scaleVals)
         valloader = torch.utils.data.DataLoader(valdata, batch_size=batch_size,
-                                                shuffle=False, collate_fn=pad_collate)
+                                                shuffle=False, collate_fn=pad_collate, drop_last=True)
     else:
         valloader = None
 
@@ -1032,7 +1100,7 @@ def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
     best_val_loss = float('inf')    
 
     # Early Stop
-    patience = 5  
+    patience = 7 
     epochs_no_improve = 0
     early_stop = False
 
@@ -1108,7 +1176,11 @@ def train_nn(data_segs,num_mks,max_len,windowIdx,scaleVals,num_epochs,prevModel,
                 print(f'\n>>> Early stopping triggered after {epoch+1} epochs (no improvement for {patience} epochs)')
                 early_stop = True
                 break
-                                                                        
+
+        if after_epoch_callback is not None:
+            after_epoch_callback(net, valloader, epoch)
+
+
         if tempCkpt is not None:
             torch.save({'epoch': epoch+1,'model_state_dict': net.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),'running_loss': running_loss,'loss' : loss,
