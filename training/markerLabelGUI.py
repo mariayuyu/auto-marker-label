@@ -79,11 +79,14 @@ app.layout = html.Div(
                         style={'margin-top':'6px'}
                         )),width=4),
                     dbc.Col(
-                        html.Div(dcc.Dropdown(
+                        html.Div(dcc.Input(
                         id='new_name',
-                        className='dropdown',
+                        className='entry_button',
                         placeholder='New name',
-                        options=[{'label': j, 'value': j} for j in markers]
+                        type='text',
+                        value='',
+                        debounce=True,
+                        style={'margin-top': '6px', 'width': '100%'}
                         )), width=4),
                     dbc.Col(width=1),
                     dbc.Col(
