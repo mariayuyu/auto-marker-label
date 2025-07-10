@@ -240,18 +240,36 @@ app.layout = html.Div(
         dbc.Row(dbc.Col(html.Div(id='timeframe'), 
                         style={'margin': '-10px 0px 0px 0px','position':'top'})),
         dbc.Row([
-            dbc.Col(html.Div(dcc.Slider(
-                id="Time_Slider",
-                min=0,
-                value=1,
-                step=incr,
-                updatemode="drag"),
-                style={"position":"left"}), width=11),
-            dbc.Col(html.Button(
+            dbc.Col(  # Slider takes 11 columns
+                html.Div(dcc.Slider(
+                    id="Time_Slider",
+                    min=0,
+                    value=1,
+                    step=incr,
+                    updatemode="drag"),
+                    style={"position": "left"}
+                ), width=10
+            ),
+            dbc.Col(
+                html.Button(
                     id='export_button',
                     className='export_button',
                     type='button',
-                    children='EXPORT TO C3D'), width=1)]),
+                    children='EXPORT TO C3D',
+                    style={'marginTop': '10px'}
+                ), width=1
+            ),
+            dbc.Col(
+                html.Button(
+                    id='export_session_pkl_button',
+                    className='export_button',
+                    type='button',
+                    children='EXPORT TO PKL',
+                    style={'marginTop': '10px'}
+                ), width=1
+            ),
+            ], justify="end"),  # align buttons right
+        
         
         dbc.Row(dbc.Col(html.Div(id='export_comment')),style={'margin-top':'5px'}),
         dbc.Row(dbc.Col(html.Div(id='pts_c3d'),style={'display':'none'})),
@@ -277,9 +295,12 @@ app.layout = html.Div(
         dbc.Row(dbc.Col(html.Div(id='rot_timestamp'),style={'display':'none'})), 
         dbc.Row(dbc.Col(html.Div(id='label_timestamp'),style={'display':'none'})), 
         dbc.Row(dbc.Col(html.Div(id='message_mod'),style={'display':'none'})),    
-        dbc.Row(dbc.Col(html.Div(id='message_split'),style={'display':'none'})),    
+        dbc.Row(dbc.Col(html.Div(id='message_split'),style={'display':'none'})),
+        dcc.Download(id="download_session_pkl"), #####
+        html.Div(id='export_session')   #####
     ]
     )
+
 
 #Update file list dropdown
 @app.callback(Output('upload_data','options'),
@@ -820,9 +841,12 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
     
 #Export to c3d
 @app.callback(Output('export_comment', 'children'), 
-              [Input('export_button', 'n_clicks'), Input('pts_current', 'children'), 
-               Input('labels_current', 'children'), Input('confidence_current', 'children'),
-               Input('frame_rate', 'children'),Input('rotang','children')], 
+              [Input('export_button', 'n_clicks'), 
+              Input('pts_current', 'children'), 
+               Input('labels_current', 'children'), 
+               Input('confidence_current', 'children'),
+               Input('frame_rate', 'children'),
+               Input('rotang','children')], 
               [State('upload_data', 'value')])
 
 def export_c3d(n_clicks, pts, labels, confidence, fs, rotang, filename):
@@ -843,6 +867,80 @@ def export_c3d(n_clicks, pts, labels, confidence, fs, rotang, filename):
             export_comment="exported " + output_name.split(os.path.sep)[-1]
   
     return export_comment
+
+# Export to pickle
+@app.callback(
+    [Output('download_session_pkl', 'data'),
+     Output('export_session', 'children')],
+    Input('export_session_pkl_button', 'n_clicks'),
+    [State('pts_current', 'children'),
+     State('labels_current', 'children'),
+     State('confidence_current', 'children'),
+     State('frame_rate', 'children'),
+     State('rotang', 'children'),
+     State('upload_data', 'value')],
+    prevent_initial_call=True
+)
+def export_pkl(n_clicks, pts, labels, confidence, fs, rotang, source_file):
+    import pickle
+    import datetime
+    import numpy as np
+    from dash.dcc import send_bytes
+
+    if not pts or not labels or not confidence:
+        raise PreventUpdate
+
+    pts = np.array(pts).astype(np.float64)  # (n_markers, n_frames, 3)
+    confidence = np.array(confidence)
+    fs = float(fs)
+    n_markers, n_frames, _ = pts.shape
+
+    # Construct Trajectories section
+    traj = {
+        "NrOfSamples": n_frames,
+        "Frequency": fs,
+        "Labels": labels,
+        "Visibility": confidence > 0.5,  # or adjust threshold if needed
+        "Residual": np.zeros((n_markers, n_frames)),  # Placeholder
+        "Position": pts
+    }
+
+    # Empty Forceplates section
+    forceplates = {
+        "NrOfSamples": 0,
+        "Frequency": fs,
+        "Location": [],
+        "Force": np.zeros((0, 3)),
+        "Moment": np.zeros((0, 3)),
+        "CoP": np.zeros((0, 3)),
+    }
+
+    # Empty EMG section
+    emg = {
+        "NrOfSamples": 0,
+        "Frequency": fs,
+        "Labels": [],
+        "Data": np.zeros((0, 0))
+    }
+
+    # Final bundle
+    data_bundle = {
+        "Forceplates": forceplates,
+        "EMG": emg,
+        "Trajectories": traj,
+    }
+
+    if source_file is not None:
+        base_name = os.path.basename(source_file)
+        name_without_ext = os.path.splitext(base_name)[0]
+        download_name = name_without_ext + '_labelled.pkl'
+
+        print("Exporting to", download_name)
+
+        return send_bytes(lambda f: pickle.dump(data_bundle, f), download_name), f"Exported full session to {download_name}"
+
+    return dash.no_update, "No source file provided"
+
     
 print("Opening Web Browser")
 webbrowser.open('http://127.0.0.1:8050/', new=2)
