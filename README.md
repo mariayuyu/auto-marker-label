@@ -9,7 +9,7 @@ I recommend creating two different virtual environments for preprocessing and la
 In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This file is used to disconnect particles, denoise particles, and track them in order to end up with a clean C3D file. 
 
 In order to run the script, change the name of the `subject` folder (e.g. Subj_50"), and `input_file` (e.g. 2-limb_02_1). 
-You can also modify the parameters for denoising and tracking. 
+You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. (5 for static, 16 for gait). 
 
 Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
 
@@ -73,6 +73,7 @@ Several packages are necessary:
 
 ## Bugs
 You may encounter several challenges during this process, please let me know if you do! But here are some bugs that I've encountered myself: 
-* Can't label files with less than 85 markers - Currently working on this
-* Pressing label button starts the process but in the end nothing happens - Refresh settings and restart, should see "finding labels and confidence scores" in the terminal
+* Can't label files with less than 85 markers - Currently working on this.
+* Pressing label button starts the process but in the end nothing happens - Refresh settings and restart, should see "finding labels and confidence scores" in the terminal.
+* Preprocessed file is tiny (e.g. 3kb) - Change the `distance` parameter in `clean_raw_c3d.py` (5 for stationary, 16 for walking should be good but feel free to experiment). 
   
