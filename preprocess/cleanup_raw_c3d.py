@@ -6,6 +6,33 @@ import trackpy
 import pandas
 import btk
 
+# --------------------------------------------------------------------------- #
+# --------------------------------- PARAMETERS ------------------------------ #
+# --------------------------------------------------------------------------- #
+
+# Parameters for denoising the particles extracted by Qualysis
+duration_cutoff = 5    # number of samples, if a marker is visible for duration_cutoff samples or less, it is removed
+distance_cutoff = 5    # mm, if a marker is within distance_cutoff mm of another marker, it is removed
+max_abs_y       = 1000 # mm, if the absolute y position of a marker is larger than this, it is removed
+
+# Tracking parameters
+memory   = 100 # number of frames for which a marker is kept in memory after it disappears
+distance = 16   # maximum distance that a marker can travel in 1 timeframe (increase for walking)
+span     = 10  # Compute velocity from the most recent span+1 frames
+
+# Subject name and file name that you want preprocessed 
+subject = 'Subj_55_1'
+input_file = 'Gait_0002 - 6'
+input_path = f"data/{subject}/{input_file}.c3d"
+
+# --------------------------------------------------------------------------- #
+
+
+print(f"input path: {input_path}")
+print(f"running path: {os.getcwd()}")
+print(f"path exists: {os.path.exists(input_path)}")
+
+
 def remove_uname_markers(input_path, output_path=None):
 
     c3d = ezc3d.c3d(input_path)
@@ -276,20 +303,6 @@ def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
 # ---------------------------
 if __name__ == "__main__":
 
-    # Parameters for denoising the particles extracted by Qualysis
-    duration_cutoff = 5    # number of samples, if a marker is visible for duration_cutoff samples or less, it is removed
-    distance_cutoff = 5    # mm, if a marker is within distance_cutoff mm of another marker, it is removed
-    max_abs_y       = 1000 # mm, if the absolute y position of a marker is larger than this, it is removed
-
-    # Tracking parameters
-    memory   = 100 # number of frames for which a marker is kept in memory after it disappears
-    distance = 5   # maximum distance that a marker can travel in 1 timeframe (increase for walking)
-    span     = 10  # Compute velocity from the most recent span+1 frames
-
-    subject = 'Subj_60_2'
-    input_file = '2-limb_02_1'
-    input_path = f"data/{subject}/{input_file}.c3d"
-
     print('Loading marker data from C3D')
     Position, Visibility = load_c3d_markers(input_path)
     print("Positions after loading:", Position.shape)
@@ -301,7 +314,7 @@ if __name__ == "__main__":
     Positions, T_appearance, T_disappearance = disconnect_particles(Position, Visibility)
     print("Positions after disconnecting:", Positions.shape)
     print("Number of particles before forceplate check:", len(Positions))
-    print("Sample Y values:", [np.nanmax(np.abs(p[:,1])) for p in Positions if not np.all(np.isnan(p[:,1]))])
+    #print("Sample Y values:", [np.nanmax(np.abs(p[:,1])) for p in Positions if not np.all(np.isnan(p[:,1]))])
 
 
     print('Denoising particles')
