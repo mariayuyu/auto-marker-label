@@ -5,7 +5,7 @@ This project is used to clean up noisy raw C3D file and label it with the standa
 
 **(https://drive.google.com/drive/folders/1DXdEskA8GN5VK8XUmYM03Nglp_H4wqA2?usp=drive_link)**
 
-**Replace the `data` folder downloaded through the link above with `data` folder in `training`**
+**Replace the `data` folder downloaded through the link above with `data` folder in `label`**
 
 I recommend creating two different virtual environments for preprocessing and labeling as the packages may collide. 
 
@@ -37,7 +37,7 @@ Packages that are necessary:
 **Can only be run on Windows environment due to `btk` package**
 
 ## Labeling 
-In the `Training` folder, you will find the trained model `best_model_0705.ckpt`, training values `training_stats_2025-07-05.pickle`, `markerLabelGUI.py` script.
+In the `label` folder, you will find the trained model `best_model_0705.ckpt`, training values `training_stats_2025-07-05.pickle`, `markerLabelGUI.py` script.
 
 Several packages are necessary: 
 * dash==2.18.2
