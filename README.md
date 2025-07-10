@@ -16,7 +16,7 @@ In order to run the script, change the name of the `subject` folder (e.g. Subj_5
 You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. (5 for static, 16 for gait). 
 
 Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
-
+```
 conda create --name preprocess
 
 conda activate preprocess
@@ -26,7 +26,7 @@ conda install python=3.11
 conda install conda-forge::btk
 
 conda install conda-forge::trackpy
-
+```
 Packages that are necessary:
 * ezc3d==1.5.18
 * numpy==1.26.4
