@@ -1,7 +1,11 @@
 # Automatically Labeling MoCap 
 This project is used to clean up noisy raw C3D file and label it with the standard 85 marker layout. 
 
-**!!Several large files (the trained model) cannot be uploaded on GitHub, (https://drive.google.com/drive/folders/1DXdEskA8GN5VK8XUmYM03Nglp_H4wqA2?usp=drive_link)!!**
+**Several large files (the trained model) cannot be uploaded on GitHub** 
+
+**(https://drive.google.com/drive/folders/1DXdEskA8GN5VK8XUmYM03Nglp_H4wqA2?usp=drive_link)**
+
+**Replace the `data` folder downloaded through the link above with `data` folder in `training`**
 
 I recommend creating two different virtual environments for preprocessing and labeling as the packages may collide. 
 
