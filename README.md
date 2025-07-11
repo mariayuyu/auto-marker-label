@@ -38,6 +38,8 @@ Packages for **preprocessing**:
 * trackpy==0.6.4
 * pandas==2.3.0
 * btk==0.4.dev0
+  
+**Can only be run on Windows environment due to `btk` package**
 
 Packages for **labeling**:
 * dash==2.18.2
@@ -55,18 +57,17 @@ Packages for **labeling**:
 * scipy==1.15.1
 * torch==2.7.0
 
-**Can only be run on Windows environment due to `btk` package**
 
 ## Preprocessing 
 In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This file is used to disconnect particles, denoise particles, and track them in order to end up with a clean C3D file. 
 
-In order to run the script, change the name of the `subject` folder (e.g. Subj_50"), and `input_file` (e.g. 2-limb_02_1). 
-You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. (5 for static, 16 for gait). 
-
-Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
+In order to run the script, change the name of the `subject` folder (e.g. Subj_50), and `input_file` (e.g. 2-limb_02_1). 
+You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. If the number of resulting markers exceeds 255, `distance` will be tuned automatically. 
 
 ## Labeling 
 The `label` folder contains all the necessary files for the GUI and labeling. No modification or tuning is required. 
+
+Follow the steps below to get started! 
 
 ### Setting up the GUI
 * Set the paths to trained model, trained values pickle file, and market set in markerLabelGUI.py.
