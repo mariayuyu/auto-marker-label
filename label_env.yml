@@ -1,4 +1,4 @@
-name: labeltest
+name: label_env
 channels:
   - defaults
 dependencies:
@@ -86,4 +86,4 @@ dependencies:
       - werkzeug==3.0.6
       - widgetsnbextension==4.0.14
       - zipp==3.23.0
-prefix: C:\Users\yuryeva\AppData\Local\miniconda3\envs\labeltest
+prefix: C:\Users\yuryeva\AppData\Local\miniconda3\envs\label_env
