@@ -17,12 +17,12 @@ max_abs_y       = 1000 # mm, if the absolute y position of a marker is larger th
 
 # Tracking parameters
 memory   = 100 # number of frames for which a marker is kept in memory after it disappears
-distance = 16   # maximum distance that a marker can travel in 1 timeframe (5 for static, around 16 for walking)
+distance = 5   # maximum distance that a marker can travel in 1 timeframe (5 for static, around 16 for walking)
 span     = 10  # Compute velocity from the most recent span+1 frames
 
 # Subject name and file name that you want preprocessed 
 subject = 'Subj_55_1'
-input_file = '1-limb-eyecl-sl_01'
+input_file = 'Gait_0002 - 6'
 input_path = f"data/{subject}/{input_file}.c3d"
 
 # --------------------------------------------------------------------------- #
@@ -184,14 +184,11 @@ def tracking(Positions, memory, distance, span):
         y.extend(list(position[:,1][invisible == 0]))
         z.extend(list(position[:,2][invisible == 0]))
         f.extend(list(times[invisible == 0]))	
-    print("particles done")
     datasheet = pandas.DataFrame({'x':x, 'y':y, 'z':z, 'frame': f})
     
     ## Automatic tracking
     predictor = trackpy.predict.NearestVelocityPredict(span = span) # takes the speed of the markers into account in order to guess where they will appear in the next timeframe
-    print("automatic tracking done")
     traj      = predictor.link_df(datasheet, distance, memory = memory, pos_columns = ['x','y','z'])
-    print("automatic tracking done")
     ## Transform the output of the tracking into an array of size particles x time x dimension 
     x = np.array(traj['x'])
     y = np.array(traj['y'])
@@ -204,7 +201,6 @@ def tracking(Positions, memory, distance, span):
 
     Positions  = np.nan*np.ones((nb_particles, duration, 3))
     Visibility = np.zeros((nb_particles, duration))
-    print("transforming done")
     for nb in range(nb_particles):
 
         indices = (p == nb) # rows of the dataframe which correspond to that particle
@@ -261,10 +257,6 @@ def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
         import traceback
         traceback.print_exc()
 
-    c3d = ezc3d.c3d(filename)
-    labels = c3d['parameters']['POINT']['LABELS']['value']
-    print(f"Total markers in saved file: {len(labels)}")
-    print("Marker labels:", labels)
 
 # ---------------------------
 # Main
@@ -292,8 +284,16 @@ if __name__ == "__main__":
     print("Positions after denoising:", Positions.shape)
     
     print('Tracking')
-    Positions, Visibility = tracking(Positions, memory, distance, span)
-    print("Positions after tracking:", Positions.shape)
+    # Tuning distance parameter
+    nb_markers = 1000
+    while nb_markers > 256:   
+        print("distance: ", distance)
+        Positions, Visibility = tracking(Positions, memory, distance, span)
+        print("Positions after tracking:", Positions.shape)
+        nb_markers = Positions.shape[0]
+
+        delta = nb_markers - 255
+        distance += min(3, max(1, delta//175))
 
     print('Saving to new c3d')
     output_path = f"data/{subject}/{input_file}_tracked.c3d"
