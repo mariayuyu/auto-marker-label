@@ -22,7 +22,7 @@ span     = 10  # Compute velocity from the most recent span+1 frames
 
 # Subject name and file name that you want preprocessed 
 subject = 'Subj_55_1'
-input_file = 'Gait_0002 - 6'
+input_file = '1-limb-eyecl-sl_01'
 input_path = f"data/{subject}/{input_file}.c3d"
 
 # --------------------------------------------------------------------------- #
@@ -32,43 +32,7 @@ print(f"input path: {input_path}")
 print(f"running path: {os.getcwd()}")
 print(f"path exists: {os.path.exists(input_path)}")
 
-
-def remove_uname_markers(input_path, output_path=None):
-
-    c3d = ezc3d.c3d(input_path)
-    marker_names = c3d['parameters']['POINT']['LABELS']['value']
-
-    # Identify indices to keep
-    keep_indices = [i for i, name in enumerate(marker_names) if not name.lower().startswith("uname")]
-    print(f"Keeping {len(keep_indices)} of {len(marker_names)} markers")
-
-    # Filter marker data
-    c3d['data']['points'] = c3d['data']['points'][:, keep_indices, :]
-
-    # Clean up per-marker metadata
-    for key in list(c3d['parameters']['POINT'].keys()):
-        param = c3d['parameters']['POINT'][key]
-        if isinstance(param, dict) and 'value' in param:
-            val = param['value']
-            # Trim arrays/lists matching original marker count
-            if isinstance(val, (list, np.ndarray)) and len(val) == len(marker_names):
-                c3d['parameters']['POINT'][key]['value'] = [val[i] for i in keep_indices] if isinstance(val, list) else val[keep_indices]
-            # Remove mismatched marker arrays
-            elif isinstance(val, (list, np.ndarray)) and len(val) != len(keep_indices) and len(val) != 1:
-                print(f"Removing POINT/{key} due to size mismatch")
-                del c3d['parameters']['POINT'][key]
-
-    # Optional cleanup
-    if 'meta_points' in c3d['data']:
-        del c3d['data']['meta_points']
-
-    # Save result
-    if output_path is None:
-        output_path = os.path.splitext(input_path)[0] + "_cleaned.c3d"
-
-    c3d.write(output_path)
-    print(f"Saved cleaned file to: {output_path}")
-    
+   
 def load_c3d_markers(filepath):
     c3d = ezc3d.c3d(filepath)
     data = c3d['data']['points']  # shape: (4, N_MARKERS, N_FRAMES)
@@ -255,7 +219,7 @@ def tracking(Positions, memory, distance, span):
         Positions[nb,:,2][time] = z[indices]
     
     return Positions, Visibility
-    
+
 def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
 
     nb_particles, nb_frames, _ = Positions.shape
@@ -265,24 +229,23 @@ def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
     Positions = Positions[valid]
     Visibility = Visibility[valid]
     nb_particles = Positions.shape[0]
-
+    
+    # Proper BTK usage with Init()
     acq = btk.btkAcquisition()
-    acq.Init(nb_particles, nb_frames)
+    acq.Init(0, nb_frames)  # Init with 0 points initially; we'll append them
     acq.SetPointFrequency(Frequency)
-    acq.Update()
 
     for nb, position in enumerate(Positions):
-        # BTK expects a shape of (nb_frames, 3)
         if not np.all(np.isnan(position)):
-            Point = btk.btkPoint(0)
-            Point.SetValues(position)  # shape: (nb_frames, 3)
-            visibility = Visibility[nb]
+            point = btk.btkPoint(f'unlabelled_{nb:03d}', nb_frames)
+            point.SetValues(position)
+            point.SetType(btk.btkPoint.Marker)
+
             residual = np.zeros(nb_frames)
-            residual[visibility == 0] = -1
-            Point.SetResiduals(residual)
-            Point.SetLabel(f'unlabelled_{nb:03d}')
-            Point.Update()
-            acq.AppendPoint(Point)
+            residual[Visibility[nb] == 0] = -1
+            point.SetResiduals(residual)
+
+            acq.AppendPoint(point)
 
     acq.Update()
 
@@ -297,6 +260,11 @@ def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
         print("Error during save:", e)
         import traceback
         traceback.print_exc()
+
+    c3d = ezc3d.c3d(filename)
+    labels = c3d['parameters']['POINT']['LABELS']['value']
+    print(f"Total markers in saved file: {len(labels)}")
+    print("Marker labels:", labels)
 
 # ---------------------------
 # Main
@@ -318,13 +286,16 @@ if __name__ == "__main__":
 
 
     print('Denoising particles')
-    denoised_Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
-    print("Positions after denoising:", denoised_Positions.shape)
+    Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
+    output_path = f"data/{subject}/{input_file}_cleaned.c3d"
+    
+    print("Positions after denoising:", Positions.shape)
+    
     print('Tracking')
-    tracked_Positions, Visibility = tracking(denoised_Positions, memory, distance, span)
-    print("Positions after tracking:", tracked_Positions.shape)
+    Positions, Visibility = tracking(Positions, memory, distance, span)
+    print("Positions after tracking:", Positions.shape)
+
     print('Saving to new c3d')
     output_path = f"data/{subject}/{input_file}_tracked.c3d"
-    save_to_c3d(tracked_Positions, Visibility, output_path)
+    save_to_c3d(Positions, Visibility, output_path)
 
-    remove_uname_markers(output_path)
