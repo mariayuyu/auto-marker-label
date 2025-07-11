@@ -7,15 +7,20 @@ This project is used to clean up noisy raw C3D file and label it with the standa
 
 **Replace the `data` folder downloaded through the link above with `data` folder in `label`**
 
-I recommend creating two different virtual environments for preprocessing and labeling as the packages may collide. 
 
-## Preprocessing 
-In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This file is used to disconnect particles, denoise particles, and track them in order to end up with a clean C3D file. 
+## Virtual Environments & Packages
+In the main folder you will find two YAML files: `preprocess_env.yml`, `label_env.yml` to easily create two virtual environments with all the necessary packages. 
 
-In order to run the script, change the name of the `subject` folder (e.g. Subj_50"), and `input_file` (e.g. 2-limb_02_1). 
-You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. (5 for static, 16 for gait). 
+Run this command in the Anaconda Prompt:
+```
+conda env create -f preprocess_env.yml
+conda env create -f label_env.yml
+```
 
-Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
+You can now activate the environment you wish in order to run the corresponding scripts.
+```conda activate preprocess_env``` or ```conda activate label_env```
+
+If you do not wish to use the YAML files, here are the required steps and packages for **preprocessing**:
 ```
 conda create --name preprocess
 
@@ -27,19 +32,14 @@ conda install conda-forge::btk
 
 conda install conda-forge::trackpy
 ```
-Packages that are necessary:
+Packages for **preprocessing**:
 * ezc3d==1.5.18
 * numpy==1.26.4
 * trackpy==0.6.4
 * pandas==2.3.0
 * btk==0.4.dev0
-  
-**Can only be run on Windows environment due to `btk` package**
 
-## Labeling 
-In the `label` folder, you will find the trained model `best_model_0705.ckpt`, training values `training_stats_2025-07-05.pickle`, `markerLabelGUI.py` script.
-
-Several packages are necessary: 
+Packages for **labeling**:
 * dash==2.18.2
 * dash-bootstrap-components==1.7.1
 * dash-core-components==2.0.0
@@ -54,6 +54,19 @@ Several packages are necessary:
 * scikit-learn==1.6.1
 * scipy==1.15.1
 * torch==2.7.0
+
+**Can only be run on Windows environment due to `btk` package**
+
+## Preprocessing 
+In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This file is used to disconnect particles, denoise particles, and track them in order to end up with a clean C3D file. 
+
+In order to run the script, change the name of the `subject` folder (e.g. Subj_50"), and `input_file` (e.g. 2-limb_02_1). 
+You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. (5 for static, 16 for gait). 
+
+Several packages are necessary for this script, here's how to create a virtual environment if you are using Anaconda and install some packages:
+
+## Labeling 
+The `label` folder contains all the necessary files for the GUI and labeling. No modification or tuning is required. 
 
 ### Setting up the GUI
 * Set the paths to trained model, trained values pickle file, and market set in markerLabelGUI.py.
