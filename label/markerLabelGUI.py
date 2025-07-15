@@ -956,10 +956,10 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
                 y=pts[Time_Slider,~I,1],
                 z=pts[Time_Slider,~I,2],
                 mode='markers',
-                    hovertext=labels_num[~I],
-                    showlegend=False,
-                    marker=dict(
-                        size=2,
+                hovertext=labels_num[~I],
+                showlegend=False,
+                marker=dict(
+                    size=2,
                         color="DarkSlateGrey",),
                 )
             )
@@ -979,18 +979,27 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
                         mode='lines',
                         line=dict(color='blue', width=3),
                         showlegend=False,
-                        hoverinfo='skip'
+                        hoverinfo='skip' 
                     ))
 
         # Center & Scale Axis on Graph
         fig.update_layout(
             autosize=False,
-            scene = dict(
-                xaxis = dict(nticks=10, range=[mid_x - max_range,mid_x + max_range],),
-                yaxis = dict(nticks=10, range=[mid_y - max_range, mid_y + max_range],),
-                zaxis = dict(nticks=10, range=[mid_z - max_range, mid_z + max_range],),
-                aspectmode="cube"
+            
+            scene=dict(
+                xaxis=dict(nticks=10),  # Removed 'range'
+                yaxis=dict(nticks=10),
+                zaxis=dict(nticks=10),
+                aspectmode="data"  # let Plotly adapt the box to the data
             ),
+            
+            # scene = dict(
+            #     xaxis = dict(nticks=10, range=[mid_x - max_range,mid_x + max_range],),
+            #     yaxis = dict(nticks=10, range=[mid_y - max_range, mid_y + max_range],),
+            #     zaxis = dict(nticks=10, range=[mid_z - max_range, mid_z + max_range],),
+            #     aspectmode="cube"
+            # ),
+            
             hoverlabel=dict(
                 bgcolor="white", 
                 font_size=11, 
