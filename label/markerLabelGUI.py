@@ -978,7 +978,8 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
                         z=z_coords,
                         mode='lines',
                         line=dict(color='blue', width=3),
-                        showlegend=False
+                        showlegend=False,
+                        hoverinfo='skip'
                     ))
 
         # Center & Scale Axis on Graph
