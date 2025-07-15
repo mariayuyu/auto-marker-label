@@ -757,7 +757,7 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
         ('RFLE', 'RLMAL'),
         ('LMMAL', 'LFME'),
         ('RMMAL', 'RFME'),
-        
+
         # Feet
         ('LMMAL', 'LLMAL'),
         ('RMMAL', 'RLMAL'),
@@ -784,12 +784,28 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
         ('LDMT5', 'LPMT5'),
         ('RDMT5', 'RPMT5'),
 
+        ('LDMT4', 'LDMT3'),
+        ('RDMT4', 'RDMT3'),
+        ('LMMT3', 'LDMT3'),
+        ('RMMT3', 'RDMT3'),
+        ('LDMT4', 'LMMT3'),
+        ('RDMT4', 'RMMT3'),
+
         ('LST', 'LTP'),
         ('RST', 'RTP'),
         ('LST', 'LCAL2'),
         ('RST', 'RCAL2'),
         ('LTP', 'LCAL2'),
-        ('RTP', 'RCAL2')
+        ('RTP', 'RCAL2'),
+
+        ('RMCAL', 'RCAL1'),
+        ('LMCAL', 'LCAL1'),
+        ('RMCAL', 'RLCAL'),
+        ('LMCAL', 'LLCAL'),
+        ('RLCAL', 'RCAL1'),
+        ('LLCAL', 'LCAL1'),
+
+
     ]
 
 
