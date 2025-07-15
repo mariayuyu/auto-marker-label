@@ -943,7 +943,7 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
                     mode='markers',
                     hovertext=labels_num[I], 
                     marker=dict(
-                        size=5,
+                        size=3,
                         cmax=1,
                         cmin=0,
                         color=confidence[I],
