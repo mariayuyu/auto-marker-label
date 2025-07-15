@@ -21,8 +21,8 @@ distance = 5   # maximum distance that a marker can travel in 1 timeframe (5 for
 span     = 10  # Compute velocity from the most recent span+1 frames
 
 # Subject name and file name that you want preprocessed 
-subject = 'Subj_55_1'
-input_file = 'Gait_0002 - 6'
+subject = 'Subj_60_2'
+input_file = '2-limb_02_1_cropped'
 input_path = f"data/{subject}/{input_file}.c3d"
 
 # --------------------------------------------------------------------------- #
@@ -216,19 +216,21 @@ def tracking(Positions, memory, distance, span):
     
     return Positions, Visibility
 
-def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
-
+def save_to_c3d(Positions, filename, Frequency=200):
     nb_particles, nb_frames, _ = Positions.shape
+
+    # Infer Visibility from NaNs
+    Visibility = ~np.isnan(Positions).any(axis=2)  # shape: (nb_particles, nb_frames)
 
     # Filter out markers with no visibility at all
     valid = np.sum(Visibility, axis=1) > 0
     Positions = Positions[valid]
     Visibility = Visibility[valid]
     nb_particles = Positions.shape[0]
-    
-    # Proper BTK usage with Init()
+
+    # Create and configure BTK acquisition
     acq = btk.btkAcquisition()
-    acq.Init(0, nb_frames)  # Init with 0 points initially; we'll append them
+    acq.Init(0, nb_frames)
     acq.SetPointFrequency(Frequency)
 
     for nb, position in enumerate(Positions):
@@ -238,7 +240,7 @@ def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
             point.SetType(btk.btkPoint.Marker)
 
             residual = np.zeros(nb_frames)
-            residual[Visibility[nb] == 0] = -1
+            residual[~Visibility[nb]] = -1
             point.SetResiduals(residual)
 
             acq.AppendPoint(point)
@@ -283,19 +285,108 @@ if __name__ == "__main__":
     
     print("Positions after denoising:", Positions.shape)
     
-    print('Tracking')
-    # Tuning distance parameter
-    nb_markers = 1000
-    while nb_markers > 256:   
-        print("distance: ", distance)
-        Positions, Visibility = tracking(Positions, memory, distance, span)
-        print("Positions after tracking:", Positions.shape)
-        nb_markers = Positions.shape[0]
+    # print('Tracking')
+    # # Tuning distance parameter
+    # nb_markers = 1000
+    # while nb_markers > 256:   
+    #     print("distance: ", distance)
+    #     Positions, Visibility = tracking(Positions, memory, distance, span)
+    #     print("Positions after tracking:", Positions.shape)
+    #     nb_markers = Positions.shape[0]
 
-        delta = nb_markers - 255
-        distance += min(3, max(1, delta//175))
+    #     delta = nb_markers - 255
+    #     distance += min(3, max(1, delta//175))
 
     print('Saving to new c3d')
     output_path = f"data/{subject}/{input_file}_tracked.c3d"
-    save_to_c3d(Positions, Visibility, output_path)
+    # save_to_c3d(Positions, Visibility, output_path)
+    save_to_c3d(Positions, output_path)
+
+
+
+# ----------------------------------------------------------------
+
+
+# def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
+
+#     nb_particles, nb_frames, _ = Positions.shape
+
+#     # Filter out markers with no visibility at all
+#     valid = np.sum(Visibility, axis=1) > 0
+#     Positions = Positions[valid]
+#     Visibility = Visibility[valid]
+#     nb_particles = Positions.shape[0]
+    
+#     # Proper BTK usage with Init()
+#     acq = btk.btkAcquisition()
+#     acq.Init(0, nb_frames)  # Init with 0 points initially; we'll append them
+#     acq.SetPointFrequency(Frequency)
+
+#     for nb, position in enumerate(Positions):
+#         if not np.all(np.isnan(position)):
+#             point = btk.btkPoint(f'unlabelled_{nb:03d}', nb_frames)
+#             point.SetValues(position)
+#             point.SetType(btk.btkPoint.Marker)
+
+#             residual = np.zeros(nb_frames)
+#             residual[Visibility[nb] == 0] = -1
+#             point.SetResiduals(residual)
+
+#             acq.AppendPoint(point)
+
+#     acq.Update()
+
+#     writer = btk.btkAcquisitionFileWriter()
+#     writer.SetFilename(filename)
+#     writer.SetInput(acq)
+
+#     try:
+#         writer.Update()
+#         print(f"Successfully saved: {filename}")
+#     except Exception as e:
+#         print("Error during save:", e)
+#         import traceback
+#         traceback.print_exc()
+
+
+# # ---------------------------
+# # Main
+# # ---------------------------
+# if __name__ == "__main__":
+
+#     print('Loading marker data from C3D')
+#     Position, Visibility = load_c3d_markers(input_path)
+#     print("Positions after loading:", Position.shape)
+#     print("Visibility sum per marker:", np.sum(Visibility, axis=1))
+#     print("Fully visible markers:", np.sum(np.mean(Visibility, axis=1) == 1))
+#     print("Partly visible markers:", np.sum((np.mean(Visibility, axis=1) > 0) & (np.mean(Visibility, axis=1) < 1)))
+
+#     print('Disconnecting particles')
+#     Positions, T_appearance, T_disappearance = disconnect_particles(Position, Visibility)
+#     print("Positions after disconnecting:", Positions.shape)
+#     print("Number of particles before forceplate check:", len(Positions))
+#     #print("Sample Y values:", [np.nanmax(np.abs(p[:,1])) for p in Positions if not np.all(np.isnan(p[:,1]))])
+
+
+#     print('Denoising particles')
+#     Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
+#     output_path = f"data/{subject}/{input_file}_cleaned.c3d"
+    
+#     print("Positions after denoising:", Positions.shape)
+    
+#     print('Tracking')
+#     # Tuning distance parameter
+#     nb_markers = 1000
+#     while nb_markers > 256:   
+#         print("distance: ", distance)
+#         Positions, Visibility = tracking(Positions, memory, distance, span)
+#         print("Positions after tracking:", Positions.shape)
+#         nb_markers = Positions.shape[0]
+
+#         delta = nb_markers - 255
+#         distance += min(3, max(1, delta//175))
+
+#     print('Saving to new c3d')
+#     output_path = f"data/{subject}/{input_file}_tracked.c3d"
+#     save_to_c3d(Positions, Visibility, output_path)
 
