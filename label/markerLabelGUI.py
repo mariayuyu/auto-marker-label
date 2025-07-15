@@ -190,7 +190,8 @@ app.layout = html.Div(
                     className='dropdown',
                     options=[{'label': 'Confidence', 'value': 'Confidence'},
                              {'label': 'Unlabelled','value': 'Unlabelled'},
-                             {'label': 'Segments','value':'Segments'}],
+                             {'label': 'Segments','value':'Segments'},
+                             {'label': 'Skeleton','value':'Skeleton'}],
                     value='Confidence'
                     ),
                     style={"margin":"0px 0px 0px 0px"}), width = {'size':2, 'offset':1}),
@@ -699,6 +700,99 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
             
     fig=''
 
+
+
+    skeleton_connections = [
+        # Upper
+        ('HEADF', 'HEADFR'),
+        ('HEADF', 'HEADFL'),
+        ('HEADFR', 'HEADR'),
+        ('HEADFL', 'HEADL'),
+        ('HEADL', 'C7'),
+        ('HEADR', 'C7'),
+        ('STERNSUP', 'C7'),
+        ('STERNINF', 'STERNSUP'),
+        ('T10', 'C7'),
+        ('T10', 'LPSI'),
+        ('T10', 'RPSI'),
+        ('RSHO', 'C7'),
+        ('LSHO', 'C7'),
+        ('RSHO', 'RUA'),
+        ('LSHO', 'LUA'),
+        ('RELL', 'RUA'),
+        ('LELL', 'LUA'),
+        ('RELL', 'RELM'),
+        ('LELL', 'LELM'),
+        ('RWRU', 'RELM'),
+        ('LWRU', 'LELM'),
+        ('RWRU', 'RDMC2'),
+        ('LWRU', 'LDMC2'),
+        ('RWRU', 'RWRR'),
+        ('LWRU', 'LWRR'),
+        ('RDMC2', 'RWRR'),
+        ('LDMC2', 'LWRR'),
+        ('RFA', 'RWRR'),
+        ('LFA', 'LWRR'),
+        ('RFA', 'RELL'),
+        ('LFA', 'LELL'),
+
+        # Lower
+        ('LASI', 'LPSI'),
+        ('RASI', 'RPSI'),
+        ('LFTC', 'LPSI'),
+        ('RFTC', 'RPSI'),
+        ('LFTC', 'LASI'),
+        ('RFTC', 'RASI'),
+        ('LFTC', 'LTH'),
+        ('RFTC', 'RTH'),
+        ('LFLE', 'LTH'),
+        ('RFLE', 'RTH'),
+        ('LFLE', 'LFME'),
+        ('RFLE', 'RFME'),
+        ('LTUB', 'LFME'),
+        ('RTUB', 'RFME'),
+        ('LTUB', 'LSHN'),
+        ('RTUB', 'RSHN'),
+        ('LFLE', 'LLMAL'),
+        ('RFLE', 'RLMAL'),
+        ('LMMAL', 'LFME'),
+        ('RMMAL', 'RFME'),
+        
+        # Feet
+        ('LMMAL', 'LLMAL'),
+        ('RMMAL', 'RLMAL'),
+
+        ('LDH', 'LMH'),
+        ('RDH', 'RMH'),
+        ('LPH', 'LMH'),
+        ('RPH', 'RMH'),
+
+        ('LDMT1', 'LMMT1'),
+        ('RDMT1', 'RMMT1'),
+        ('LPMT1', 'LMMT1'),
+        ('RPMT1', 'RMMT1'),
+
+        ('LNAV', 'LMF'),
+        ('RNAV', 'RMF'),
+        ('LCUB', 'LMF'),
+        ('RCUB', 'RMF'),
+
+        ('LPMT5', 'LDMT2'),
+        ('RPMT5', 'RDMT2'),
+        ('LDMT5', 'LDMT2'),
+        ('RDMT5', 'RDMT2'),
+        ('LDMT5', 'LPMT5'),
+        ('RDMT5', 'RPMT5'),
+
+        ('LST', 'LTP'),
+        ('RST', 'RTP'),
+        ('LST', 'LCAL2'),
+        ('RST', 'RCAL2'),
+        ('LTP', 'LCAL2'),
+        ('RTP', 'RCAL2')
+    ]
+
+
     if pts != '':
         print('graphing')
         
@@ -820,6 +914,57 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
                         colorscale='hsv'),
                 ))          
         
+        elif dropdown=='Skeleton':
+            I = (labels=='') | (labels=='None')
+            fig = go.FigureWidget(
+                data=[
+                go.Scatter3d(
+                    x=pts[Time_Slider,I,0],
+                    y=pts[Time_Slider,I,1],
+                    z=pts[Time_Slider,I,2],
+                    showlegend=False,
+                    visible=True,
+                    mode='markers',
+                    hovertext=labels_num[I], 
+                    marker=dict(
+                        size=5,
+                        cmax=1,
+                        cmin=0,
+                        color=confidence[I],
+                        colorbar=dict(title="Confidence"),
+                        colorscale=['red', 'yellow', 'green']
+                    ),
+                )])
+            fig.add_trace(go.Scatter3d(
+                x=pts[Time_Slider,~I,0],
+                y=pts[Time_Slider,~I,1],
+                z=pts[Time_Slider,~I,2],
+                mode='markers',
+                    hovertext=labels_num[~I],
+                    showlegend=False,
+                    marker=dict(
+                        size=2,
+                        color="DarkSlateGrey",),
+                )
+            )
+            for start_label, end_label in skeleton_connections:
+                if start_label in labels and end_label in labels:
+                    start_idx = np.where(labels == start_label)[0][0]
+                    end_idx = np.where(labels == end_label)[0][0]
+
+                    x_coords = [pts[Time_Slider, start_idx, 0], pts[Time_Slider, end_idx, 0]]
+                    y_coords = [pts[Time_Slider, start_idx, 1], pts[Time_Slider, end_idx, 1]]
+                    z_coords = [pts[Time_Slider, start_idx, 2], pts[Time_Slider, end_idx, 2]]
+
+                    fig.add_trace(go.Scatter3d(
+                        x=x_coords,
+                        y=y_coords,
+                        z=z_coords,
+                        mode='lines',
+                        line=dict(color='blue', width=3),
+                        showlegend=False
+                    ))
+
         # Center & Scale Axis on Graph
         fig.update_layout(
             autosize=False,
@@ -931,13 +1076,10 @@ def export_pkl(n_clicks, pts, labels, confidence, fs, rotang, source_file):
     }
 
     if source_file is not None:
-        base_name = os.path.basename(source_file)
-        name_without_ext = os.path.splitext(base_name)[0]
-        download_name = name_without_ext + '_labelled.pkl'
+        filename = source_file[:-4] + '_labelled.pkl'
+        print("Exporting to", filename)
 
-        print("Exporting to", download_name)
-
-        return send_bytes(lambda f: pickle.dump(data_bundle, f), download_name), f"Exported full session to {download_name}"
+        return send_bytes(lambda f: pickle.dump(data_bundle, f), filename), f"Exported full session to {filename}"
 
     return dash.no_update, "No source file provided"
 
