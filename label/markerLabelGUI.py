@@ -965,13 +965,17 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
             )
             for start_label, end_label in skeleton_connections:
                 if start_label in labels and end_label in labels:
-                    start_idx = np.where(labels == start_label)[0][0]
-                    end_idx = np.where(labels == end_label)[0][0]
+                    start_indices = np.where(labels == start_label)[0]
+                    end_indices = np.where(labels == end_label)[0]
+
+                    # Choose the first visible marker for the current frame
+                    start_idx = next((i for i in start_indices if not np.any(np.isnan(pts[Time_Slider, i]))), None)
+                    end_idx = next((i for i in end_indices if not np.any(np.isnan(pts[Time_Slider, i]))), None)
 
                     x_coords = [pts[Time_Slider, start_idx, 0], pts[Time_Slider, end_idx, 0]]
                     y_coords = [pts[Time_Slider, start_idx, 1], pts[Time_Slider, end_idx, 1]]
                     z_coords = [pts[Time_Slider, start_idx, 2], pts[Time_Slider, end_idx, 2]]
-
+                    
                     fig.add_trace(go.Scatter3d(
                         x=x_coords,
                         y=y_coords,
