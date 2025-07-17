@@ -4,7 +4,6 @@ import os
 import trackpy.predict
 import trackpy
 import pandas
-import btk
 
 # --------------------------------------------------------------------------- #
 # --------------------------------- PARAMETERS ------------------------------ #
@@ -32,7 +31,7 @@ print(f"input path: {input_path}")
 print(f"running path: {os.getcwd()}")
 print(f"path exists: {os.path.exists(input_path)}")
 
-   
+  
 def load_c3d_markers(filepath):
     c3d = ezc3d.c3d(filepath)
     data = c3d['data']['points']  # shape: (4, N_MARKERS, N_FRAMES)
@@ -117,7 +116,7 @@ def disconnect_particles(Position, Visibility):
         
     return Positions, T_appearance_all, T_disappearance_all
     
-import numpy as np
+
 
 def denoise_particles(Positions, T_appearance, T_disappearance,
                       duration_cutoff, distance_cutoff, max_abs_y,
@@ -269,139 +268,39 @@ def tracking(Positions, memory, distance, span):
     
     return Positions, Visibility
 
+def save_to_c3d(Positions, Visibility, filename_out, Frequency=200):
 
-# DENOISING ONLY
-# def save_to_c3d(Positions, filename, Frequency=200):
-#     nb_particles, nb_frames, _ = Positions.shape
+    nb_markers, nb_frames, _ = Positions.shape
 
-#     # Infer Visibility from NaNs
-#     Visibility = ~np.isnan(Positions).any(axis=2)  # shape: (nb_particles, nb_frames)
-
-#     # Filter out markers with no visibility at all
-#     valid = np.sum(Visibility, axis=1) > 0
-#     Positions = Positions[valid]
-#     Visibility = Visibility[valid]
-#     nb_particles = Positions.shape[0]
-
-#     # Create and configure BTK acquisition
-#     acq = btk.btkAcquisition()
-#     acq.Init(0, nb_frames)
-#     acq.SetPointFrequency(Frequency)
-
-#     for nb, position in enumerate(Positions):
-#         if not np.all(np.isnan(position)):
-#             point = btk.btkPoint(f'unlabelled_{nb:03d}', nb_frames)
-#             point.SetValues(position)
-#             point.SetType(btk.btkPoint.Marker)
-
-#             residual = np.zeros(nb_frames)
-#             residual[~Visibility[nb]] = -1
-#             point.SetResiduals(residual)
-
-#             acq.AppendPoint(point)
-
-#     acq.Update()
-
-#     writer = btk.btkAcquisitionFileWriter()
-#     writer.SetFilename(filename)
-#     writer.SetInput(acq)
-
-#     try:
-#         writer.Update()
-#         print(f"Successfully saved: {filename}")
-#     except Exception as e:
-#         print("Error during save:", e)
-#         import traceback
-#         traceback.print_exc()
-
-
-# # ---------------------------
-# # Main
-# # ---------------------------
-# if __name__ == "__main__":
-
-#     print('Loading marker data from C3D')
-#     Position, Visibility = load_c3d_markers(input_path)
-#     print("Positions after loading:", Position.shape)
-#     print("Visibility sum per marker:", np.sum(Visibility, axis=1))
-#     print("Fully visible markers:", np.sum(np.mean(Visibility, axis=1) == 1))
-#     print("Partly visible markers:", np.sum((np.mean(Visibility, axis=1) > 0) & (np.mean(Visibility, axis=1) < 1)))
-
-#     print('Disconnecting particles')
-#     Positions, T_appearance, T_disappearance = disconnect_particles(Position, Visibility)
-#     print("Positions after disconnecting:", Positions.shape)
-#     print("Number of particles before forceplate check:", len(Positions))
-#     #print("Sample Y values:", [np.nanmax(np.abs(p[:,1])) for p in Positions if not np.all(np.isnan(p[:,1]))])
-
-
-#     print('Denoising particles')
-#     Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
-#     output_path = f"data/{subject}/{input_file}_cleaned.c3d"
-    
-#     print("Positions after denoising:", Positions.shape)
-    
-#     # print('Tracking')
-#     # # Tuning distance parameter
-#     # nb_markers = 1000
-#     # while nb_markers > 256:   
-#     #     print("distance: ", distance)
-#     #     Positions, Visibility = tracking(Positions, memory, distance, span)
-#     #     print("Positions after tracking:", Positions.shape)
-#     #     nb_markers = Positions.shape[0]
-
-#     #     delta = nb_markers - 255
-#     #     distance += min(3, max(1, delta//175))
-
-#     print('Saving to new c3d')
-#     output_path = f"data/{subject}/{input_file}_denoised.c3d"
-#     # save_to_c3d(Positions, Visibility, output_path)
-#     save_to_c3d(Positions, output_path)
-
-
-
-# ----------------------------------------------------------------
-
-# TRACKING
-def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
-
-    nb_particles, nb_frames, _ = Positions.shape
-
-    # Filter out markers with no visibility at all
+    # Filter out fully invisible markers
     valid = np.sum(Visibility, axis=1) > 0
     Positions = Positions[valid]
     Visibility = Visibility[valid]
-    nb_particles = Positions.shape[0]
-    
-    # Proper BTK usage with Init()
-    acq = btk.btkAcquisition()
-    acq.Init(0, nb_frames)  # Init with 0 points initially; we'll append them
-    acq.SetPointFrequency(Frequency)
+    nb_markers = Positions.shape[0]
 
-    for nb, position in enumerate(Positions):
-        if not np.all(np.isnan(position)):
-            point = btk.btkPoint(f'unlabelled_{nb:03d}', nb_frames)
-            point.SetValues(position)
-            point.SetType(btk.btkPoint.Marker)
+    # Transpose to shape (4, num_markers, num_frames)
+    points = np.ones((4, nb_markers, nb_frames), dtype=np.float32) * np.nan
+    points[0:3, :, :] = np.transpose(Positions, (2, 0, 1))  # x, y, z
+    points[3, :, :] = 0.0  # residuals 0 for visible, -1 for invisible
+    points[3, Visibility == 0] = -1.0
 
-            residual = np.zeros(nb_frames)
-            residual[Visibility[nb] == 0] = -1
-            point.SetResiduals(residual)
+    # Create C3D structure
+    c3d = ezc3d.c3d()
+    c3d['data']['points'] = points
 
-            acq.AppendPoint(point)
+    # Add marker names
+    labels = [f'unlabelled_{i:03d}' for i in range(nb_markers)]
+    c3d['parameters']['POINT']['LABELS']['value'] = labels
+    c3d['parameters']['POINT']['DESCRIPTIONS']['value'] = labels
+    c3d['parameters']['POINT']['USED']['value'] = [nb_markers]
+    c3d['parameters']['POINT']['FRAMES']['value'] = [nb_frames]
+    c3d['parameters']['POINT']['RATE']['value'] = [Frequency]
+    c3d['header']['points']['frame_rate'] = Frequency
+    c3d['header']['points']['size'] = nb_markers
 
-    acq.Update()
-
-    writer = btk.btkAcquisitionFileWriter()
-    writer.SetFilename(filename)
-    writer.SetInput(acq)
-
-    try:
-        writer.Update()
-        print(f"Successfully saved: {filename}")
-    except Exception as e:
-        print("Error during save:", e)
-        import traceback
-        traceback.print_exc()
+    # Save to file
+    c3d.write(filename_out)
+    print(f"Saved: {filename_out}")
 
 
 # ---------------------------
