@@ -26,20 +26,13 @@ conda create --name preprocess
 
 conda activate preprocess
 
-conda install python=3.11
-
-conda install conda-forge::btk
-
 conda install conda-forge::trackpy
 ```
 Packages for **preprocessing**:
-* ezc3d==1.5.18
-* numpy==1.26.4
+* ezc3d==1.5.19
+* numpy==2.3.1
 * trackpy==0.6.4
-* pandas==2.3.0
-* btk==0.4.dev0
-  
-**Can only be run on Windows environment due to `btk` package**
+* pandas==2.2.3
 
 Packages for **labeling**:
 * dash==2.18.2
