@@ -3,6 +3,18 @@ import matplotlib.pyplot as plt
 import os
 import glob
 
+# --------------------------- plot_results.py ----------------------------
+# Used for
+# * plotting a single run's validation, training loss and accuracy over epochs 
+# * plotting bar graph of several different runs and their best validation loss, accuracy 
+# ------------------------------------------------------------------------
+
+
+# Paths
+csv_file = 'grid_results/run_12/metrics.csv' 
+grid_dir = 'grid_results'
+top_n = 12      # top n runs plotted
+
 def load_training_metrics(csv_path):
     epochs = []
     train_losses = []
@@ -159,6 +171,5 @@ def compare_runs(grid_dir='grid_results', top_n=6):
 
 # Main
 if __name__ == '__main__':
-    csv_file = 'grid_results/run_12/metrics.csv'  
-    plot_metrics(csv_file, save=True)
-    # compare_runs(grid_dir='grid_results', top_n=12)
+    #plot_metrics(csv_file, save=True)
+    compare_runs(grid_dir, top_n=12)
