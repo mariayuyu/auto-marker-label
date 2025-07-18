@@ -79,7 +79,7 @@ Follow the steps below to get started!
   * The Error Detection box lists unlabelled markers and duplicated labels. The time frames where the error was detected are displayed. Note that the listed marker is guaranteed to be visible for the first and last frames, but may be missing from the intermediate frames of the listed range.
 * Correct incorrect labels using the Modify Labels and Split Trajectories section. Type the number for the marker to change the label and type in its label name then click the Rename button. To leave a marker unlabelled, don't type anything and click Rename (this can be cleared by clicking the 'x').
 * If a trajectory switches between two markers, it can be split in the Modify Labels and Split Trajectories section. Enter the marker number and the frame you wish to split it at and click Split. A new marker will be added containing the trajectory of that marker from the split frame onwards.
-* Export a labelled version of the .c3d file by clicking the Export to C3D button. This will rotate the data back to the original orientation and fill small gaps through cubic spline interpolation. Unlablled markers will not be exported.
+* Export a labelled version of the .c3d file by clicking the Export to C3D button. This will rotate the data back to the original orientation and fill small gaps through cubic spline interpolation. Unlablled markers will be exported as well with empty labels.
 * Before loading a new c3d file, click the Refresh Settings button.
 
 ## Bugs
