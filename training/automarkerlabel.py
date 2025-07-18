@@ -739,7 +739,7 @@ def import_raw_c3d(file,rotang):
     if isinstance(fs,(list,tuple,np.ndarray)):
         fs = fs[0] 
     rawlabels = c3ddat['parameters']['POINT']['LABELS']['value']
-    
+    print(rawpts.shape[1])
     # # Try to find and fix places where the markers swap indices
     # thresh = 20
     # for m in range(rawpts.shape[1]):
@@ -769,52 +769,78 @@ def import_raw_c3d(file,rotang):
     #                 kf = np.reshape(kf,(-1,2))
     #         k = k+1
             
-    # Wherever there is a gap, check if the marker jumps further than the distance to the 
-    # next closest marker. If so, split it into a new trajectory.
-    pts = np.empty((rawpts.shape[0],0,3))
-    labels = []
-    for m in range(rawpts.shape[1]):    
-        # key frames where the marker appears or disappears  
-        kf = np.where(np.isnan(rawpts[1:,m,0]) != np.isnan(rawpts[0:-1,m,0]))[0]
-        if ~np.isnan(rawpts[0,m,0]):
-            kf = np.insert(kf,0,-1,axis=0)
-        if ~np.isnan(rawpts[-1,m,0]):
-            kf = np.concatenate((kf,[rawpts.shape[0]-1]))
-        kf = np.reshape(kf,(-1,2))
-        k = 0
-        while k < kf.shape[0]:
-            i1 = kf[k,0]
-            d = 0
-            gapsize = 0
-            min_d = 1000
-            while d < min_d and gapsize < 60:
-                if k < kf.shape[0]-1:
-                    d = np.linalg.norm(rawpts[kf[k+1,0]+1,m,:] - rawpts[kf[k,1],m,:])
-                    all_d = np.linalg.norm(rawpts[kf[k,1]+1,:,:] - rawpts[kf[k,1],m,:],axis=1)
-                    all_d[m] = np.nan
-                    if (~np.isnan(all_d)).sum() > 0:
-                        min_d = np.nanmin(all_d)
-                    else:
-                        min_d = 1000
-                    gapsize = kf[k+1,0] - kf[k,1]
-                else:
-                    gapsize = 61
-                k=k+1
-            if kf[k-1,1] - i1 > 2:
-                traj = np.nan * np.ones((rawpts.shape[0],1,3))
-                traj[i1+1:kf[k-1,1]+1,0,:] = rawpts[i1+1:kf[k-1,1]+1,m,:] 
-                pts = np.append(pts,traj,axis=1)
-                labels.append(rawlabels[m])
+    # # Wherever there is a gap, check if the marker jumps further than the distance to the 
+    # # next closest marker. If so, split it into a new trajectory.
+    # pts = np.empty((rawpts.shape[0],0,3))
+    # labels = []
+    # for m in range(rawpts.shape[1]):    
+    #     # key frames where the marker appears or disappears  
+    #     kf = np.where(np.isnan(rawpts[1:,m,0]) != np.isnan(rawpts[0:-1,m,0]))[0]
+    #     if ~np.isnan(rawpts[0,m,0]):
+    #         kf = np.insert(kf,0,-1,axis=0)
+    #     if ~np.isnan(rawpts[-1,m,0]):
+    #         kf = np.concatenate((kf,[rawpts.shape[0]-1]))
+    #     kf = np.reshape(kf,(-1,2))
+    #     k = 0
+    #     while k < kf.shape[0]:
+    #         i1 = kf[k,0]
+    #         d = 0
+    #         gapsize = 0
+    #         min_d = 1000
+    #         while d < min_d and gapsize < 60:
+    #             if k < kf.shape[0]-1:
+    #                 d = np.linalg.norm(rawpts[kf[k+1,0]+1,m,:] - rawpts[kf[k,1],m,:])
+    #                 all_d = np.linalg.norm(rawpts[kf[k,1]+1,:,:] - rawpts[kf[k,1],m,:],axis=1)
+    #                 all_d[m] = np.nan
+    #                 if (~np.isnan(all_d)).sum() > 0:
+    #                     min_d = np.nanmin(all_d)
+    #                 else:
+    #                     min_d = 1000
+    #                 gapsize = kf[k+1,0] - kf[k,1]
+    #             else:
+    #                 gapsize = 61
+    #             k=k+1
+    #         if kf[k-1,1] - i1 > 2:
+    #             traj = np.nan * np.ones((rawpts.shape[0],1,3))
+    #             traj[i1+1:kf[k-1,1]+1,0,:] = rawpts[i1+1:kf[k-1,1]+1,m,:] 
+    #             pts = np.append(pts,traj,axis=1)
+    #             labels.append(rawlabels[m])
+    #         else:
+    #             print(f"DROPPED marker {m} segment from {i1+1} to {kf[k-1,1]}")
                 
 
-    # Angle to rotate points about z-axis
-    rotang = float(rotang) * np.pi/180 
-    Ralign = np.array([[np.cos(rotang),-np.sin(rotang),0],
-                       [np.sin(rotang),np.cos(rotang),0],
-                       [0,0,1]])
-    for i in range(pts.shape[1]):
-        pts[:,i,:] = np.matmul(Ralign,pts[:,i,:].transpose()).transpose()
+    # # Angle to rotate points about z-axis
+    # rotang = float(rotang) * np.pi/180 
+    # Ralign = np.array([[np.cos(rotang),-np.sin(rotang),0],
+    #                    [np.sin(rotang),np.cos(rotang),0],
+    #                    [0,0,1]])
+    # for i in range(pts.shape[1]):
+    #     pts[:,i,:] = np.matmul(Ralign,pts[:,i,:].transpose()).transpose()
+    # print(pts.shape[1])
                 
+    # return pts, fs, labels
+
+    pts = np.empty((rawpts.shape[0], 0, 3))
+    labels = []
+
+    for m in range(rawpts.shape[1]):
+        traj = rawpts[:, m, :].copy()  # full trajectory with possible NaNs
+        traj = traj.reshape(rawpts.shape[0], 1, 3)
+        pts = np.append(pts, traj, axis=1)
+        labels.append(rawlabels[m])
+
+    # Angle to rotate points about z-axis
+    rotang = float(rotang) * np.pi / 180
+    Ralign = np.array([
+        [np.cos(rotang), -np.sin(rotang), 0],
+        [np.sin(rotang),  np.cos(rotang), 0],
+        [0,               0,              1]
+    ])
+
+    for i in range(pts.shape[1]):
+        pts[:, i, :] = np.matmul(Ralign, pts[:, i, :].T).T
+
+    print(pts.shape[1])
     return pts, fs, labels
 
 
@@ -1313,6 +1339,11 @@ def marker_label(pts,modelpath,trainvalpath,markersetpath,fs,windowSize):
     if pts.shape[1] < num_mks:
         pts = np.concatenate((pts,np.nan * np.ones((pts.shape[0],num_mks-pts.shape[1],3),
                                                     dtype=pts.dtype)),axis=1)
+        # Pad confidence with 0 
+        if confidence is not None:
+            confidence = np.concatenate((confidence, np.zeros(num_mks-pts.shape[1])))
+        else:
+            confidence = np.zeros(num_mks)
     
     # --- Initial Label Prediction --- #
     
