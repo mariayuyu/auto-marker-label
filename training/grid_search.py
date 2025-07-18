@@ -4,6 +4,11 @@ import shutil
 import automarkerlabel as aml
 import datetime
 
+# --------------------------- grid_search.py -----------------------
+# Train using all possible combinations of hyperparameters 
+# Save results in grid_results folder 
+# -------------------------------------------------------------------
+
 # Define the parameter grid
 param_grid = {
     'batch_size': [32, 64, 100],
