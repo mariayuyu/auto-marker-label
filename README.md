@@ -8,33 +8,31 @@ This project is used to clean up noisy raw C3D file and label it with the standa
 **Replace the `data` folder downloaded through the link above with `data` folder in `label`**
 
 
-## Virtual Environments & Packages
-In the main folder you will find two YAML files: `preprocess_env.yml`, `label_env.yml` to easily create two virtual environments with all the necessary packages. 
+## Virtual Environment & Packages
+In the main folder you will find a YAML file: `label_env.yml` to create a virtual environment with all the necessary packages. 
 
 Run this command in the Anaconda Prompt:
 ```
-conda env create -f preprocess_env.yml
 conda env create -f label_env.yml
 ```
 
 You can now activate the environment you wish in order to run the corresponding scripts.
-```conda activate preprocess_env``` or ```conda activate label_env```
+```conda activate label_env```
 
-If you do not wish to use the YAML files, here are the required steps and packages for **preprocessing**:
+If you do not wish to use the YAML file, here are the required steps and packages to start using a conda virtual environment:
 ```
-conda create --name preprocess
+conda create --name label_env
 
-conda activate preprocess
+conda activate label_env
 
 conda install conda-forge::trackpy
-```
-Packages for **preprocessing**:
-* ezc3d==1.5.19
-* numpy==2.3.1
-* trackpy==0.6.4
-* pandas==2.2.3
 
-Packages for **labeling**:
+conda install pip
+
+pip install _______
+```
+
+Packages for **labeling and preprocessing**:
 * dash==2.18.2
 * dash-bootstrap-components==1.7.1
 * dash-core-components==2.0.0
@@ -49,6 +47,7 @@ Packages for **labeling**:
 * scikit-learn==1.6.1
 * scipy==1.15.1
 * torch==2.7.0
+* trackpy==0.6.4 (conda-forge)
 
 
 ## Preprocessing 
