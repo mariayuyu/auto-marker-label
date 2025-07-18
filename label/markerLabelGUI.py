@@ -192,7 +192,7 @@ app.layout = html.Div(
                              {'label': 'Unlabelled','value': 'Unlabelled'},
                              {'label': 'Segments','value':'Segments'},
                              {'label': 'Skeleton','value':'Skeleton'}],
-                    value='Confidence'
+                    value='Skeleton'
                     ),
                     style={"margin":"0px 0px 0px 0px"}), width = {'size':2, 'offset':1}),
                 dbc.Col(html.Div(dcc.Input(
@@ -269,7 +269,7 @@ app.layout = html.Div(
                     style={'marginTop': '10px'}
                 ), width=1
             ),
-            ], justify="end"),  # align buttons right
+            ], justify="end"), 
         
         
         dbc.Row(dbc.Col(html.Div(id='export_comment')),style={'margin-top':'5px'}),
@@ -535,6 +535,7 @@ def label_handler(labels_split, labels_c3d, labels_updated, rawlabels, split_tim
     
     if label_timestamp==0 and rawlabels: #Markers still unlabelled
         labels_current= rawlabels 
+        
     if np.nanmax(timestamps)==0:
         # print('NOTHING DONE YET')
         if len(labels_current)>1:
@@ -1075,7 +1076,7 @@ def export_pkl(n_clicks, pts, labels, confidence, fs, rotang, source_file):
         "NrOfSamples": n_frames,
         "Frequency": fs,
         "Labels": labels,
-        "Visibility": confidence > 0.5,  # or adjust threshold if needed
+        "Visibility": confidence > 0.5,  
         "Residual": np.zeros((n_markers, n_frames)),  # Placeholder
         "Position": pts
     }
