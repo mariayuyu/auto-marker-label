@@ -4,44 +4,34 @@ import os
 import trackpy.predict
 import trackpy
 import pandas
-import btk
 
-def remove_uname_markers(input_path, output_path=None):
+# --------------------------------------------------------------------------- #
+# --------------------------------- PARAMETERS ------------------------------ #
+# --------------------------------------------------------------------------- #
 
-    c3d = ezc3d.c3d(input_path)
-    marker_names = c3d['parameters']['POINT']['LABELS']['value']
+# Parameters for denoising the particles extracted by Qualysis
+duration_cutoff = 5    # number of samples, if a marker is visible for duration_cutoff samples or less, it is removed
+distance_cutoff = 5    # mm, if a marker is within distance_cutoff mm of another marker, it is removed
+max_abs_y       = 1000 # mm, if the absolute y position of a marker is larger than this, it is removed
 
-    # Identify indices to keep
-    keep_indices = [i for i, name in enumerate(marker_names) if not name.lower().startswith("uname")]
-    print(f"Keeping {len(keep_indices)} of {len(marker_names)} markers")
+# Tracking parameters
+memory   = 100 # number of frames for which a marker is kept in memory after it disappears
+distance = 5   # maximum distance that a marker can travel in 1 timeframe (5 for static, around 16 for walking)
+span     = 10  # Compute velocity from the most recent span+1 frames
 
-    # Filter marker data
-    c3d['data']['points'] = c3d['data']['points'][:, keep_indices, :]
+# Subject name and file name that you want preprocessed 
+subject = 'Subj_55_1'
+input_file = 'Gait_0002 - 6'
+input_path = f"data/{subject}/{input_file}.c3d"
 
-    # Clean up per-marker metadata
-    for key in list(c3d['parameters']['POINT'].keys()):
-        param = c3d['parameters']['POINT'][key]
-        if isinstance(param, dict) and 'value' in param:
-            val = param['value']
-            # Trim arrays/lists matching original marker count
-            if isinstance(val, (list, np.ndarray)) and len(val) == len(marker_names):
-                c3d['parameters']['POINT'][key]['value'] = [val[i] for i in keep_indices] if isinstance(val, list) else val[keep_indices]
-            # Remove mismatched marker arrays
-            elif isinstance(val, (list, np.ndarray)) and len(val) != len(keep_indices) and len(val) != 1:
-                print(f"Removing POINT/{key} due to size mismatch")
-                del c3d['parameters']['POINT'][key]
+# --------------------------------------------------------------------------- #
 
-    # Optional cleanup
-    if 'meta_points' in c3d['data']:
-        del c3d['data']['meta_points']
 
-    # Save result
-    if output_path is None:
-        output_path = os.path.splitext(input_path)[0] + "_cleaned.c3d"
+print(f"input path: {input_path}")
+print(f"running path: {os.getcwd()}")
+print(f"path exists: {os.path.exists(input_path)}")
 
-    c3d.write(output_path)
-    print(f"Saved cleaned file to: {output_path}")
-    
+  
 def load_c3d_markers(filepath):
     c3d = ezc3d.c3d(filepath)
     data = c3d['data']['points']  # shape: (4, N_MARKERS, N_FRAMES)
@@ -126,51 +116,104 @@ def disconnect_particles(Position, Visibility):
         
     return Positions, T_appearance_all, T_disappearance_all
     
-def denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y):
-    # Remove particles which are visible for duration_cutoff or less 
-    keep_indices    = T_disappearance - T_appearance > duration_cutoff
-    print('%i particles removed because they were too short'%(len(T_appearance)-len(keep_indices)))
-    Positions       = Positions[keep_indices]
-    T_appearance    = T_appearance[keep_indices]
+
+
+def denoise_particles(Positions, T_appearance, T_disappearance,
+                      duration_cutoff, distance_cutoff, max_abs_y,
+                      max_dxy=1000, max_dz=1500):
+    # --- Remove particles that are too short ---
+    durations = T_disappearance - T_appearance
+    keep_indices = durations > duration_cutoff
+    print(f'{np.sum(~keep_indices)} particles removed because they were too short')
+    
+    Positions = Positions[keep_indices]
+    T_appearance = T_appearance[keep_indices]
     T_disappearance = T_disappearance[keep_indices]
-    
-    # Remove instants when a particle is too close to other particles
-    # Recursively, starting with the bit of shortest duration, removes its overlaps with the other bits
-    durations       = T_disappearance - T_appearance
-    sort_indices    = np.argsort(durations)
-    Positions       = Positions[sort_indices]
-    T_appearance    = T_appearance[sort_indices]
+
+    # --- Sort by duration (shortest first) ---
+    durations = T_disappearance - T_appearance
+    sort_indices = np.argsort(durations)
+    Positions = Positions[sort_indices]
+    T_appearance = T_appearance[sort_indices]
     T_disappearance = T_disappearance[sort_indices]
-    
+
+    # --- Remove points too close to others ---
     nb_particles = len(T_appearance)
     nb_timepoints_removed = 0
-    for nb in range(nb_particles-1):
-        t_appearance    = int(T_appearance[nb])
-        t_disappearance = int(T_disappearance[nb])
-        position        = Positions[nb,t_appearance:t_disappearance]
-        other_positions = Positions[nb+1:,t_appearance:t_disappearance]
-        
-        # calculate the distance to each other bit
-        difference = other_positions - np.array([position])
-        distance   = np.sqrt(np.sum(difference**2, axis = 2)) 
-        
-        # at every time point, what is the distance to the nearest bit
-        min_distance = np.min(distance, axis = 0) # time
-        
-        # if this distance is too small, remove that timepoint from the bit
-        Positions[nb,t_appearance:t_disappearance][min_distance < distance_cutoff] = np.zeros((t_disappearance-t_appearance, 3))[min_distance < distance_cutoff]
-        nb_timepoints_removed += np.sum(min_distance < distance_cutoff)
-    print('%i timepoints removed because the particle was too close to other particles'%nb_timepoints_removed)
-    
-    
-    # Remove particles which are outside the forceplates 
-    NewPositions = []
-    for position in Positions:
-        if np.nanmax(np.abs(position[:,1])) < max_abs_y:
-            NewPositions.append(position)
-    print('%i particles removed because they were outside the forceplates'%(nb_particles-len(NewPositions)))
-    
-    return np.array(NewPositions)
+    for nb in range(nb_particles - 1):
+        t_start = int(T_appearance[nb])
+        t_end = int(T_disappearance[nb])
+        pos = Positions[nb, t_start:t_end]
+        others = Positions[nb+1:, t_start:t_end]
+
+        diff = others - pos[None, :, :]
+        dist = np.sqrt(np.sum(diff**2, axis=2))
+        min_dist = np.min(dist, axis=0)
+
+        mask = min_dist < distance_cutoff
+        Positions[nb, t_start:t_end][mask] = 0
+        nb_timepoints_removed += np.sum(mask)
+
+    print(f'{nb_timepoints_removed} timepoints removed due to proximity to other particles')
+
+    # --- Remove particles completely zeroed out ---
+    nonzero_mask = np.any(Positions != 0, axis=(1, 2))
+    Positions = Positions[nonzero_mask]
+    T_appearance = T_appearance[nonzero_mask]
+    T_disappearance = T_disappearance[nonzero_mask]
+
+    # --- Remove particles outside forceplate area ---
+    forceplate_mask = np.array([
+        np.nanmax(np.abs(pos[:, 1])) < max_abs_y for pos in Positions
+    ])
+    print(f'{np.sum(~forceplate_mask)} particles removed for being outside forceplates')
+
+    Positions = Positions[forceplate_mask]
+    T_appearance = T_appearance[forceplate_mask]
+    T_disappearance = T_disappearance[forceplate_mask]
+
+    # --- Compute per-frame center ---
+    Positions = np.array(Positions)
+    n_frames = Positions.shape[1]
+    centers = []
+    for t in range(n_frames):
+        pts_t = Positions[:, t, :]
+        valid = ~np.isnan(pts_t).any(axis=1) & ~(pts_t == 0).all(axis=1)
+        if np.any(valid):
+            centers.append(np.mean(pts_t[valid], axis=0))
+        else:
+            centers.append(np.full(3, np.nan))
+    centers = np.stack(centers)
+
+    # --- Remove particles too far from center (axis-specific thresholds) ---
+    final_positions = []
+    removed_far = 0
+    for i in range(len(Positions)):
+        t_start = int(T_appearance[i])
+        t_end = int(T_disappearance[i])
+        pos = Positions[i, t_start:t_end]
+        ctr = centers[t_start:t_end]
+
+        valid = ~np.isnan(pos).any(axis=1) & ~np.isnan(ctr).any(axis=1)
+        if not np.any(valid):
+            removed_far += 1
+            continue
+
+        diffs = np.abs(pos[valid] - ctr[valid])
+        mean_diffs = np.mean(diffs, axis=0)  # shape (3,): [mean_x_diff, mean_y_diff, mean_z_diff]
+
+        if (mean_diffs[0] < max_dxy and
+            mean_diffs[1] < max_dxy and
+            mean_diffs[2] < max_dz):
+            final_positions.append(Positions[i])
+        else:
+            removed_far += 1
+
+    print(f"{removed_far} particles removed for being too far from framewise center")
+
+
+    return np.array(final_positions)
+
     
 def tracking(Positions, memory, distance, span):
 
@@ -193,14 +236,11 @@ def tracking(Positions, memory, distance, span):
         y.extend(list(position[:,1][invisible == 0]))
         z.extend(list(position[:,2][invisible == 0]))
         f.extend(list(times[invisible == 0]))	
-    print("particles done")
     datasheet = pandas.DataFrame({'x':x, 'y':y, 'z':z, 'frame': f})
     
     ## Automatic tracking
     predictor = trackpy.predict.NearestVelocityPredict(span = span) # takes the speed of the markers into account in order to guess where they will appear in the next timeframe
-    print("automatic tracking done")
     traj      = predictor.link_df(datasheet, distance, memory = memory, pos_columns = ['x','y','z'])
-    print("automatic tracking done")
     ## Transform the output of the tracking into an array of size particles x time x dimension 
     x = np.array(traj['x'])
     y = np.array(traj['y'])
@@ -213,7 +253,6 @@ def tracking(Positions, memory, distance, span):
 
     Positions  = np.nan*np.ones((nb_particles, duration, 3))
     Visibility = np.zeros((nb_particles, duration))
-    print("transforming done")
     for nb in range(nb_particles):
 
         indices = (p == nb) # rows of the dataframe which correspond to that particle
@@ -228,67 +267,46 @@ def tracking(Positions, memory, distance, span):
         Positions[nb,:,2][time] = z[indices]
     
     return Positions, Visibility
-    
-def save_to_c3d(Positions, Visibility, filename, Frequency = 200):
 
-    nb_particles, nb_frames, _ = Positions.shape
+def save_to_c3d(Positions, Visibility, filename_out, Frequency=200):
 
-    # Filter out markers with no visibility at all
+    nb_markers, nb_frames, _ = Positions.shape
+
+    # Filter out fully invisible markers
     valid = np.sum(Visibility, axis=1) > 0
     Positions = Positions[valid]
     Visibility = Visibility[valid]
-    nb_particles = Positions.shape[0]
+    nb_markers = Positions.shape[0]
 
-    acq = btk.btkAcquisition()
-    acq.Init(nb_particles, nb_frames)
-    acq.SetPointFrequency(Frequency)
-    acq.Update()
+    # Transpose to shape (4, num_markers, num_frames)
+    points = np.ones((4, nb_markers, nb_frames), dtype=np.float32) * np.nan
+    points[0:3, :, :] = np.transpose(Positions, (2, 0, 1))  # x, y, z
+    points[3, :, :] = 0.0  # residuals 0 for visible, -1 for invisible
+    points[3, Visibility == 0] = -1.0
 
-    for nb, position in enumerate(Positions):
-        # BTK expects a shape of (nb_frames, 3)
-        if not np.all(np.isnan(position)):
-            Point = btk.btkPoint(0)
-            Point.SetValues(position)  # shape: (nb_frames, 3)
-            visibility = Visibility[nb]
-            residual = np.zeros(nb_frames)
-            residual[visibility == 0] = -1
-            Point.SetResiduals(residual)
-            Point.SetLabel(f'unlabelled_{nb:03d}')
-            Point.Update()
-            acq.AppendPoint(Point)
+    # Create C3D structure
+    c3d = ezc3d.c3d()
+    c3d['data']['points'] = points
 
-    acq.Update()
+    # Add marker names
+    labels = [f'unlabelled_{i:03d}' for i in range(nb_markers)]
+    c3d['parameters']['POINT']['LABELS']['value'] = labels
+    c3d['parameters']['POINT']['DESCRIPTIONS']['value'] = labels
+    c3d['parameters']['POINT']['USED']['value'] = [nb_markers]
+    c3d['parameters']['POINT']['FRAMES']['value'] = [nb_frames]
+    c3d['parameters']['POINT']['RATE']['value'] = [Frequency]
+    c3d['header']['points']['frame_rate'] = Frequency
+    c3d['header']['points']['size'] = nb_markers
 
-    writer = btk.btkAcquisitionFileWriter()
-    writer.SetFilename(filename)
-    writer.SetInput(acq)
+    # Save to file
+    c3d.write(filename_out)
+    print(f"Saved: {filename_out}")
 
-    try:
-        writer.Update()
-        print(f"Successfully saved: {filename}")
-    except Exception as e:
-        print("Error during save:", e)
-        import traceback
-        traceback.print_exc()
 
 # ---------------------------
 # Main
 # ---------------------------
 if __name__ == "__main__":
-
-    # Parameters for denoising the particles extracted by Qualysis
-    duration_cutoff = 5    # number of samples, if a marker is visible for duration_cutoff samples or less, it is removed
-    distance_cutoff = 5    # mm, if a marker is within distance_cutoff mm of another marker, it is removed
-    max_abs_y       = 1000 # mm, if the absolute y position of a marker is larger than this, it is removed
-
-    # Tracking parameters
-    memory   = 100 # number of frames for which a marker is kept in memory after it disappears
-    distance = 5   # maximum distance that a marker can travel in 1 timeframe (increase for walking)
-    span     = 10  # Compute velocity from the most recent span+1 frames
-
-    subject = 'Subj_60_2'
-    input_file = '2-limb_02_1'
-    input_path = f"data/{subject}/{input_file}.c3d"
 
     print('Loading marker data from C3D')
     Position, Visibility = load_c3d_markers(input_path)
@@ -301,17 +319,28 @@ if __name__ == "__main__":
     Positions, T_appearance, T_disappearance = disconnect_particles(Position, Visibility)
     print("Positions after disconnecting:", Positions.shape)
     print("Number of particles before forceplate check:", len(Positions))
-    print("Sample Y values:", [np.nanmax(np.abs(p[:,1])) for p in Positions if not np.all(np.isnan(p[:,1]))])
+    #print("Sample Y values:", [np.nanmax(np.abs(p[:,1])) for p in Positions if not np.all(np.isnan(p[:,1]))])
 
 
     print('Denoising particles')
-    denoised_Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
-    print("Positions after denoising:", denoised_Positions.shape)
+    Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
+    output_path = f"data/{subject}/{input_file}_cleaned.c3d"
+    
+    print("Positions after denoising:", Positions.shape)
+    
     print('Tracking')
-    tracked_Positions, Visibility = tracking(denoised_Positions, memory, distance, span)
-    print("Positions after tracking:", tracked_Positions.shape)
+    # Tuning distance parameter
+    nb_markers = 1000
+    while nb_markers > 180:   
+        print("distance: ", distance)
+        Positions, Visibility = tracking(Positions, memory, distance, span)
+        print("Positions after tracking:", Positions.shape)
+        nb_markers = Positions.shape[0]
+
+        delta = nb_markers - 255
+        distance += min(3, max(1, delta//175))
+
     print('Saving to new c3d')
     output_path = f"data/{subject}/{input_file}_tracked.c3d"
-    save_to_c3d(tracked_Positions, Visibility, output_path)
+    save_to_c3d(Positions, Visibility, output_path)
 
-    remove_uname_markers(output_path)
