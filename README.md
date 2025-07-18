@@ -6,9 +6,9 @@ A. L. Clouthier, G. B. Ross, M. P. Mavor, I. Coll, A. Boyle and R. B. Graham, "D
 
 **Several large files (the trained model) cannot be uploaded on GitHub** 
 
-**(https://drive.google.com/drive/folders/1DXdEskA8GN5VK8XUmYM03Nglp_H4wqA2?usp=drive_link)**
+**[https://keeper.mpdl.mpg.de/d/c85ed3975bd64ac0864b/]**
 
-**Replace the `data` folder downloaded through the link above with `data` folder in `label`**
+**Replace the `data` folder in `label` with `data` folder downloaded through the link above**
 
 
 ## Virtual Environment & Packages
