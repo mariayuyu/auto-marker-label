@@ -1,3 +1,14 @@
+`plot_results.py`: plots validation/training loss and accuracy of one run or several (csv file).
+
+`training` folder: 
+- `automarkerlabel.py`, `markerLabelGUI.py`, `trainAlgorithm.py` all Clouthier's code for training and labeling, slightly modified (validation-trainign split, saves metrics, saves best-model with lowest validation loss, early-stopping (patience can be modified in function `train_nn`)). 
+- `grid_search.py` iterates through all the given hyperparameters.
+
+`preprocess` folder: 
+- `cleanup_raw_c3d.py` preprocesses raw file for labeling.
+- `old2new_labels.py`: takes labeled c3d file and converts old label names to new (used for preprocessing data for training). 
+
+
 # An Open-Source Platform for the Automatic Labelling of Motion Capture Markers using Deep Learning
 
 An algorithm that uses machine learning to automatically label optical motion capture markers. The algorithm can be trained on existing data or simulated marker trajectories. Data and code is provided to generate the simulated trajectories for custom marker sets.
