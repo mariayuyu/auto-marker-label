@@ -190,8 +190,9 @@ app.layout = html.Div(
                     className='dropdown',
                     options=[{'label': 'Confidence', 'value': 'Confidence'},
                              {'label': 'Unlabelled','value': 'Unlabelled'},
-                             {'label': 'Segments','value':'Segments'}],
-                    value='Confidence'
+                             {'label': 'Segments','value':'Segments'},
+                             {'label': 'Skeleton','value':'Skeleton'}],
+                    value='Skeleton'
                     ),
                     style={"margin":"0px 0px 0px 0px"}), width = {'size':2, 'offset':1}),
                 dbc.Col(html.Div(dcc.Input(
@@ -240,18 +241,36 @@ app.layout = html.Div(
         dbc.Row(dbc.Col(html.Div(id='timeframe'), 
                         style={'margin': '-10px 0px 0px 0px','position':'top'})),
         dbc.Row([
-            dbc.Col(html.Div(dcc.Slider(
-                id="Time_Slider",
-                min=0,
-                value=1,
-                step=incr,
-                updatemode="drag"),
-                style={"position":"left"}), width=11),
-            dbc.Col(html.Button(
+            dbc.Col(  # Slider takes 11 columns
+                html.Div(dcc.Slider(
+                    id="Time_Slider",
+                    min=0,
+                    value=1,
+                    step=incr,
+                    updatemode="drag"),
+                    style={"position": "left"}
+                ), width=10
+            ),
+            dbc.Col(
+                html.Button(
                     id='export_button',
                     className='export_button',
                     type='button',
-                    children='EXPORT TO C3D'), width=1)]),
+                    children='EXPORT TO C3D',
+                    style={'marginTop': '10px'}
+                ), width=1
+            ),
+            dbc.Col(
+                html.Button(
+                    id='export_session_pkl_button',
+                    className='export_button',
+                    type='button',
+                    children='EXPORT TO PKL',
+                    style={'marginTop': '10px'}
+                ), width=1
+            ),
+            ], justify="end"), 
+        
         
         dbc.Row(dbc.Col(html.Div(id='export_comment')),style={'margin-top':'5px'}),
         dbc.Row(dbc.Col(html.Div(id='pts_c3d'),style={'display':'none'})),
@@ -277,9 +296,12 @@ app.layout = html.Div(
         dbc.Row(dbc.Col(html.Div(id='rot_timestamp'),style={'display':'none'})), 
         dbc.Row(dbc.Col(html.Div(id='label_timestamp'),style={'display':'none'})), 
         dbc.Row(dbc.Col(html.Div(id='message_mod'),style={'display':'none'})),    
-        dbc.Row(dbc.Col(html.Div(id='message_split'),style={'display':'none'})),    
+        dbc.Row(dbc.Col(html.Div(id='message_split'),style={'display':'none'})),
+        dcc.Download(id="download_session_pkl"), #####
+        html.Div(id='export_session')   #####
     ]
     )
+
 
 #Update file list dropdown
 @app.callback(Output('upload_data','options'),
@@ -513,6 +535,7 @@ def label_handler(labels_split, labels_c3d, labels_updated, rawlabels, split_tim
     
     if label_timestamp==0 and rawlabels: #Markers still unlabelled
         labels_current= rawlabels 
+        
     if np.nanmax(timestamps)==0:
         # print('NOTHING DONE YET')
         if len(labels_current)>1:
@@ -678,6 +701,115 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
             
     fig=''
 
+
+
+    skeleton_connections = [
+        # Upper
+        ('HEADF', 'HEADFR'),
+        ('HEADF', 'HEADFL'),
+        ('HEADFR', 'HEADR'),
+        ('HEADFL', 'HEADL'),
+        ('HEADL', 'C7'),
+        ('HEADR', 'C7'),
+        ('STERNSUP', 'C7'),
+        ('STERNINF', 'STERNSUP'),
+        ('T10', 'C7'),
+        ('T10', 'LPSI'),
+        ('T10', 'RPSI'),
+        ('RSHO', 'C7'),
+        ('LSHO', 'C7'),
+        ('RSHO', 'RUA'),
+        ('LSHO', 'LUA'),
+        ('RELL', 'RUA'),
+        ('LELL', 'LUA'),
+        ('RELL', 'RELM'),
+        ('LELL', 'LELM'),
+        ('RWRR', 'RELM'),
+        ('LWRR', 'LELM'),
+        ('RWRU', 'RDMC2'),
+        ('LWRU', 'LDMC2'),
+        ('RWRU', 'RWRR'),
+        ('LWRU', 'LWRR'),
+        ('RDMC2', 'RWRR'),
+        ('LDMC2', 'LWRR'),
+        ('RFA', 'RWRU'),
+        ('LFA', 'LWRU'),
+        ('RFA', 'RELL'),
+        ('LFA', 'LELL'),
+
+        # Lower
+        ('LASI', 'LPSI'),
+        ('RASI', 'RPSI'),
+        ('LFTC', 'LPSI'),
+        ('RFTC', 'RPSI'),
+        ('LFTC', 'LASI'),
+        ('RFTC', 'RASI'),
+        ('LFTC', 'LTH'),
+        ('RFTC', 'RTH'),
+        ('LFLE', 'LTH'),
+        ('RFLE', 'RTH'),
+        ('LFLE', 'LFME'),
+        ('RFLE', 'RFME'),
+        ('LTUB', 'LFME'),
+        ('RTUB', 'RFME'),
+        ('LTUB', 'LSHN'),
+        ('RTUB', 'RSHN'),
+        ('LFLE', 'LLMAL'),
+        ('RFLE', 'RLMAL'),
+        ('LMMAL', 'LFME'),
+        ('RMMAL', 'RFME'),
+
+        # Feet
+        ('LMMAL', 'LLMAL'),
+        ('RMMAL', 'RLMAL'),
+
+        ('LDH', 'LMH'),
+        ('RDH', 'RMH'),
+        ('LPH', 'LMH'),
+        ('RPH', 'RMH'),
+
+        ('LDMT1', 'LMMT1'),
+        ('RDMT1', 'RMMT1'),
+        ('LPMT1', 'LMMT1'),
+        ('RPMT1', 'RMMT1'),
+
+        ('LNAV', 'LMF'),
+        ('RNAV', 'RMF'),
+        ('LCUB', 'LMF'),
+        ('RCUB', 'RMF'),
+
+        ('LPMT5', 'LDMT2'),
+        ('RPMT5', 'RDMT2'),
+        ('LDMT5', 'LDMT2'),
+        ('RDMT5', 'RDMT2'),
+        ('LDMT5', 'LPMT5'),
+        ('RDMT5', 'RPMT5'),
+
+        ('LDMT4', 'LDMT3'),
+        ('RDMT4', 'RDMT3'),
+        ('LMMT3', 'LDMT3'),
+        ('RMMT3', 'RDMT3'),
+        ('LDMT4', 'LMMT3'),
+        ('RDMT4', 'RMMT3'),
+
+        ('LST', 'LTP'),
+        ('RST', 'RTP'),
+        ('LST', 'LCAL2'),
+        ('RST', 'RCAL2'),
+        ('LTP', 'LCAL2'),
+        ('RTP', 'RCAL2'),
+
+        ('RMCAL', 'RCAL1'),
+        ('LMCAL', 'LCAL1'),
+        ('RMCAL', 'RLCAL'),
+        ('LMCAL', 'LLCAL'),
+        ('RLCAL', 'RCAL1'),
+        ('LLCAL', 'LCAL1'),
+
+
+    ]
+
+
     if pts != '':
         print('graphing')
         
@@ -799,15 +931,80 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
                         colorscale='hsv'),
                 ))          
         
+        elif dropdown=='Skeleton':
+            I = (labels=='') | (labels=='None')
+            fig = go.FigureWidget(
+                data=[
+                go.Scatter3d(
+                    x=pts[Time_Slider,I,0],
+                    y=pts[Time_Slider,I,1],
+                    z=pts[Time_Slider,I,2],
+                    showlegend=False,
+                    visible=True,
+                    mode='markers',
+                    hovertext=labels_num[I], 
+                    marker=dict(
+                        size=3,
+                        cmax=1,
+                        cmin=0,
+                        color=confidence[I],
+                        colorbar=dict(title="Confidence"),
+                        colorscale=['red', 'yellow', 'green']
+                    ),
+                )])
+            fig.add_trace(go.Scatter3d(
+                x=pts[Time_Slider,~I,0],
+                y=pts[Time_Slider,~I,1],
+                z=pts[Time_Slider,~I,2],
+                mode='markers',
+                hovertext=labels_num[~I],
+                showlegend=False,
+                marker=dict(
+                    size=2,
+                        color="DarkSlateGrey",),
+                )
+            )
+            for start_label, end_label in skeleton_connections:
+                if start_label in labels and end_label in labels:
+                    start_indices = np.where(labels == start_label)[0]
+                    end_indices = np.where(labels == end_label)[0]
+
+                    # Choose the first visible marker for the current frame
+                    start_idx = next((i for i in start_indices if not np.any(np.isnan(pts[Time_Slider, i]))), None)
+                    end_idx = next((i for i in end_indices if not np.any(np.isnan(pts[Time_Slider, i]))), None)
+
+                    x_coords = [pts[Time_Slider, start_idx, 0], pts[Time_Slider, end_idx, 0]]
+                    y_coords = [pts[Time_Slider, start_idx, 1], pts[Time_Slider, end_idx, 1]]
+                    z_coords = [pts[Time_Slider, start_idx, 2], pts[Time_Slider, end_idx, 2]]
+                    
+                    fig.add_trace(go.Scatter3d(
+                        x=x_coords,
+                        y=y_coords,
+                        z=z_coords,
+                        mode='lines',
+                        line=dict(color='blue', width=3),
+                        showlegend=False,
+                        hoverinfo='skip' 
+                    ))
+
         # Center & Scale Axis on Graph
         fig.update_layout(
             autosize=False,
-            scene = dict(
-                xaxis = dict(nticks=10, range=[mid_x - max_range,mid_x + max_range],),
-                yaxis = dict(nticks=10, range=[mid_y - max_range, mid_y + max_range],),
-                zaxis = dict(nticks=10, range=[mid_z - max_range, mid_z + max_range],),
-                aspectmode="cube"
+            
+            scene=dict(
+                xaxis=dict(nticks=10),  # Removed 'range'
+                yaxis=dict(nticks=10),
+                zaxis=dict(nticks=10),
+                aspectmode="data"  # let Plotly adapt the box to the data
             ),
+            
+            # scene = dict(
+            #     xaxis = dict(nticks=10, range=[mid_x - max_range,mid_x + max_range],),
+            #     yaxis = dict(nticks=10, range=[mid_y - max_range, mid_y + max_range],),
+            #     zaxis = dict(nticks=10, range=[mid_z - max_range, mid_z + max_range],),
+            #     aspectmode="cube"
+            # ),
+            
             hoverlabel=dict(
                 bgcolor="white", 
                 font_size=11, 
@@ -820,9 +1017,12 @@ def update_graph(dropdown,Time_Slider, pts, labels, confidence):
     
 #Export to c3d
 @app.callback(Output('export_comment', 'children'), 
-              [Input('export_button', 'n_clicks'), Input('pts_current', 'children'), 
-               Input('labels_current', 'children'), Input('confidence_current', 'children'),
-               Input('frame_rate', 'children'),Input('rotang','children')], 
+              [Input('export_button', 'n_clicks'), 
+              Input('pts_current', 'children'), 
+               Input('labels_current', 'children'), 
+               Input('confidence_current', 'children'),
+               Input('frame_rate', 'children'),
+               Input('rotang','children')], 
               [State('upload_data', 'value')])
 
 def export_c3d(n_clicks, pts, labels, confidence, fs, rotang, filename):
@@ -843,6 +1043,77 @@ def export_c3d(n_clicks, pts, labels, confidence, fs, rotang, filename):
             export_comment="exported " + output_name.split(os.path.sep)[-1]
   
     return export_comment
+
+# Export to pickle
+@app.callback(
+    [Output('download_session_pkl', 'data'),
+     Output('export_session', 'children')],
+    Input('export_session_pkl_button', 'n_clicks'),
+    [State('pts_current', 'children'),
+     State('labels_current', 'children'),
+     State('confidence_current', 'children'),
+     State('frame_rate', 'children'),
+     State('rotang', 'children'),
+     State('upload_data', 'value')],
+    prevent_initial_call=True
+)
+def export_pkl(n_clicks, pts, labels, confidence, fs, rotang, source_file):
+    import pickle
+    import datetime
+    import numpy as np
+    from dash.dcc import send_bytes
+
+    if not pts or not labels or not confidence:
+        raise PreventUpdate
+
+    pts = np.array(pts).astype(np.float64)  # (n_markers, n_frames, 3)
+    confidence = np.array(confidence)
+    fs = float(fs)
+    n_markers, n_frames, _ = pts.shape
+
+    # Construct Trajectories section
+    traj = {
+        "NrOfSamples": n_frames,
+        "Frequency": fs,
+        "Labels": labels,
+        "Visibility": confidence > 0.5,  
+        "Residual": np.zeros((n_markers, n_frames)),  # Placeholder
+        "Position": pts
+    }
+
+    # Empty Forceplates section
+    forceplates = {
+        "NrOfSamples": 0,
+        "Frequency": fs,
+        "Location": [],
+        "Force": np.zeros((0, 3)),
+        "Moment": np.zeros((0, 3)),
+        "CoP": np.zeros((0, 3)),
+    }
+
+    # Empty EMG section
+    emg = {
+        "NrOfSamples": 0,
+        "Frequency": fs,
+        "Labels": [],
+        "Data": np.zeros((0, 0))
+    }
+
+    # Final bundle
+    data_bundle = {
+        "Forceplates": forceplates,
+        "EMG": emg,
+        "Trajectories": traj,
+    }
+
+    if source_file is not None:
+        filename = source_file[:-4] + '_labelled.pkl'
+        print("Exporting to", filename)
+
+        return send_bytes(lambda f: pickle.dump(data_bundle, f), filename), f"Exported full session to {filename}"
+
+    return dash.no_update, "No source file provided"
+
     
 print("Opening Web Browser")
 webbrowser.open('http://127.0.0.1:8050/', new=2)
