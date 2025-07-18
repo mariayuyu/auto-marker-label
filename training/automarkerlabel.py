@@ -1768,40 +1768,40 @@ def export_labelled_c3d(pts,labels,rotang,filenamein,filenameout,markers,gapsize
         rotang = 0.0
 
     # recombine marker trajectories
-    pts_out = np.empty((pts.shape[0],0,3),dtype=pts.dtype)
+    unique_labels = sorted(set(labels), key=lambda x: (x not in markers, markers.index(x) if x in markers else float('inf')))
+
+    pts_out = np.empty((pts.shape[0], 0, 3), dtype=pts.dtype)
     markers_out = []
-    for m in range(len(markers)):
-        traj = np.nan * np.ones((pts.shape[0],1,3),dtype=pts.dtype)
-        I = [i for i,x in enumerate(labels) if x == markers[m]]
+
+    for m_label in unique_labels:
+        traj = np.nan * np.ones((pts.shape[0], 1, 3), dtype=pts.dtype)
+        I = [i for i, x in enumerate(labels) if x == m_label]
         k = 1
         for i in I:
-            if ((~np.isnan(np.stack((pts[:,i,0],traj[:,0,0]),axis=1))).sum(1) > 1).any():
-                # if there is overlap, then we'll have to add a new marker
-                # check if these are maybe the same marker due to a ghost marker situation
-                d = np.nanmean(np.linalg.norm(pts[:,i,:] - traj[:,0,:],axis=1))
-                olframes = ((~np.isnan(np.stack(((
-                                pts[:,i,0]),traj[:,0,0]),axis=1))).sum(1) > 1).sum()
+            if ((~np.isnan(np.stack((pts[:, i, 0], traj[:, 0, 0]), axis=1))).sum(1) > 1).any():
+                d = np.nanmean(np.linalg.norm(pts[:, i, :] - traj[:, 0, :], axis=1))
+                olframes = ((~np.isnan(np.stack((pts[:, i, 0], traj[:, 0, 0]), axis=1))).sum(1) > 1).sum()
                 if ~(d < 25 or (d < 40 and olframes < 10) or (d < 50 and olframes < 5)):
-                    markers_out.append(markers[m] + str(k))
-                    pts_out = np.append(pts_out,traj,axis=1)
-                    traj[:,:,:] = np.expand_dims(pts[:,i,:],axis=1)
-                    k = k+1
+                    markers_out.append(m_label + str(k))
+                    pts_out = np.append(pts_out, traj, axis=1)
+                    traj[:, :, :] = np.expand_dims(pts[:, i, :], axis=1)
+                    k += 1
                 else:
-                    traj[~np.isnan(pts[:,i,0]),0,:] = np.nanmean(np.stack((
-                            pts[~np.isnan(pts[:,i,0]),i,:],
-                            traj[~np.isnan(pts[:,i,0]),0,:]),axis=1),axis=1)
+                    traj[~np.isnan(pts[:, i, 0]), 0, :] = np.nanmean(np.stack((
+                        pts[~np.isnan(pts[:, i, 0]), i, :],
+                        traj[~np.isnan(pts[:, i, 0]), 0, :]), axis=1), axis=1)
             else:
-                traj[~np.isnan(pts[:,i,0]),0,:] = pts[~np.isnan(pts[:,i,0]),i,:]
-        pts_out = np.append(pts_out,traj,axis=1)
+                traj[~np.isnan(pts[:, i, 0]), 0, :] = pts[~np.isnan(pts[:, i, 0]), i, :]
+        pts_out = np.append(pts_out, traj, axis=1)
         if k == 1:
-            markers_out.append(markers[m])
+            markers_out.append(m_label)
         else:
-            markers_out.append(markers[m] + str(k))
-    
+            markers_out.append(m_label + str(k))
+            
     # Fill small gaps
     for m in range(pts_out.shape[1]):
         df = pd.DataFrame(pts_out[:,m,:])
-        df = df.interpolate(axis=0,limit=gapsize,limit_area='inside',method='cubic')
+        df = df.interpolate(axis=0,limit=gapsize,limit_area='inside',method='linear')
         pts_out[:,m,:] = df
               
     # Rotate points back to their original orientation
