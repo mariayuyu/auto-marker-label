@@ -51,7 +51,7 @@ FCnodes = 128
 lr = 0.005
 momentum = 0.65
 
-# Create a unique filename with timestamp
+# Filename for metrics csv file
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 csv_path = f"metrics_{timestamp}.csv"
 
@@ -61,7 +61,7 @@ def compute_epoch_metrics(model, valloader, epoch, savepath):
     if valloader is None:
         return
 
-    device = next(model.parameters()).device  # <- Add this line
+    device = next(model.parameters()).device  
 
     model.eval()
     all_preds, all_labels = [], []
