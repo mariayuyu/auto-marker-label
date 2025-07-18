@@ -84,7 +84,7 @@ Follow the steps below to get started!
 
 ## Bugs
 You may encounter several challenges during this process, please let me know if you do! But here are some bugs that I've encountered myself: 
-* Can't label files with less than 85 markers - Currently working on this.
+* Can't label files with less than 85 trajectories.
 * Pressing label button starts the process but in the end nothing happens - Refresh settings and restart, should see "finding labels and confidence scores" in the terminal.
 * Preprocessed file is tiny (e.g. 3kb) - Change the `distance` parameter in `clean_raw_c3d.py` (5 for stationary, 16 for walking should be good but feel free to experiment). 
   
