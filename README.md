@@ -1,5 +1,8 @@
 # Automatically Labeling MoCap 
 This project is used to clean up noisy raw C3D file and label it with the standard 85 marker layout. 
+Implementation of: 
+
+A. L. Clouthier, G. B. Ross, M. P. Mavor, I. Coll, A. Boyle and R. B. Graham, "Development and Validation of a Deep Learning Algorithm and Open-Source Platform for the Automatic Labelling of Motion Capture Markers," in IEEE Access, doi: 10.1109/ACCESS.2021.3062748.
 
 **Several large files (the trained model) cannot be uploaded on GitHub** 
 
