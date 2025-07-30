@@ -4,11 +4,6 @@ Implementation of:
 
 A. L. Clouthier, G. B. Ross, M. P. Mavor, I. Coll, A. Boyle and R. B. Graham, "Development and Validation of a Deep Learning Algorithm and Open-Source Platform for the Automatic Labelling of Motion Capture Markers," in IEEE Access, doi: 10.1109/ACCESS.2021.3062748.
 
-**Several large files (the trained model) cannot be uploaded on GitHub** 
-
-**[https://keeper.mpdl.mpg.de/d/c85ed3975bd64ac0864b/]**
-
-**Replace the `data` folder in `label` with `data` folder downloaded through the link above**
 
 
 ## Virtual Environment & Packages
@@ -35,7 +30,7 @@ conda install pip
 pip install _______
 ```
 
-Packages for **labeling and preprocessing**:
+Packages for **preprocessing, labeling, training**:
 * dash==2.18.2
 * dash-bootstrap-components==1.7.1
 * dash-core-components==2.0.0
@@ -60,6 +55,13 @@ In order to run the script, change the name of the `subject` folder (e.g. Subj_5
 You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. If the number of resulting markers exceeds 255, `distance` will be tuned automatically. 
 
 ## Labeling 
+
+**Several large files (the trained model) cannot be uploaded on GitHub** 
+
+**[https://keeper.mpdl.mpg.de/d/c85ed3975bd64ac0864b/]**
+
+**Replace the `data` folder in `label` with `data` folder downloaded through the link above**
+
 The `label` folder contains all the necessary files for the GUI and labeling. No modification or tuning is required. 
 
 Follow the steps below to get started! 
@@ -93,49 +95,7 @@ You may encounter several challenges during this process, please let me know if 
 
 
 
-
-
-`plot_results.py`: plots validation/training loss and accuracy of one run or several (csv file).
-
-`training` folder: 
-- `automarkerlabel.py`, `markerLabelGUI.py`, `trainAlgorithm.py` all Clouthier's code for training and labeling, slightly modified (validation-trainign split, saves metrics, saves best-model with lowest validation loss, early-stopping (patience can be modified in function `train_nn`)). 
-- `grid_search.py` iterates through all the given hyperparameters.
-
-`preprocess` folder: 
-- `cleanup_raw_c3d.py` preprocesses raw file for labeling.
-- `old2new_labels.py`: takes labeled c3d file and converts old label names to new (used for preprocessing data for training). 
-
-
-# An Open-Source Platform for the Automatic Labelling of Motion Capture Markers using Deep Learning
-
-An algorithm that uses machine learning to automatically label optical motion capture markers. The algorithm can be trained on existing data or simulated marker trajectories. Data and code is provided to generate the simulated trajectories for custom marker sets.
-
-Please cite:
-
-A. L. Clouthier, G. B. Ross, M. P. Mavor, I. Coll, A. Boyle and R. B. Graham, "Development and Validation of a Deep Learning Algorithm and Open-Source Platform for the Automatic Labelling of Motion Capture Markers," in IEEE Access, doi: [10.1109/ACCESS.2021.3062748](https://doi.org/10.1109/ACCESS.2021.3062748).
- 
-![Marker Labelling GUI](/images/auto-marker-label-GUI.jpg) 
- 
-## Installation
-This code has been tested using Python 3.12. The following packages are required and can be installed using pip. The version used in testing is listed. See requirements.txt for the full list of versions tested.
-```
-dash==2.18.2
-dash-bootstrap-components==1.7.1
-dash-core-components==2.0.0
-dash-html-components==2.0.0
-ezc3d==1.5.18
-h5py==3.13.0
-ipywidgets==8.1.5
-mydcc==0.1.22
-numpy==2.2.2
-pandas==2.2.3
-plotly==5.24.1
-scikit-learn==1.6.1
-scipy==1.15.1
-torch==2.5.1
-```
-
-## Use
+## Training
 ### Generate Simulated Trajectories
 If you do not have existing labelled motion capture data to train the algorithm, simulated trajectories can be generated. 
 
@@ -159,26 +119,6 @@ If you have your own training data, skip this step.
 - Define an OpenSim marker set, if not done already (see above).
 - Run **trainAlgorithm.py**. The training will be performed on a GPU, if one is available. 
 Note that this may take a long time to run (ie. hours - days). Training time can be reduced by using less training data (set num_participants in generateSimTrajectories.py).
-
-### Setup the GUI
-- Set the paths to trained model, trained values pickle file, and market set in **markerLabelGUI.py**.
-- Run **markerLabelGUI.py**, this will open the GUI in your browser.
-
-### Using the GUI 
-- Enter the folder path where the c3d files to be labelled are located.
-- Select the desired file from the dropdown menu.
-- Click *Load Data*, the loading is complete when the plot of markers appears.
-- If the person is not facing the +x direction, enter the angle to rotate the data about the z-axis (vertical) and click *Submit*. This angle should be chosen such that the person faces +x for the majority of the trial. 
-- Click *Label Markers*.
-- Examine the results.
-  - Clicking and dragging rotates, the scroll wheel zooms, and right clicking translates the plot. Hovering over a marker displays the marker number, label, and coordinates.
-  - The slider at the bottom can be used to view different time frames. After clicking the slider, the left and right arrow keys can be used to adjust the timeframe as well.
-  - The type of marker visualization can be selected from the *Visualization* dropdown menu. *Confidence* colours the markers based on the confidence in the predicted label. *Unlabelled* highlights unlabelled markers in red. *Segments* displays markers attached to the same body segment in the same colour.
-  - The *Error Detection* box lists unlabelled markers and duplicated labels. The time frames where the error was detected are displayed. Note that the listed marker is guaranteed to be visible for the first and last frames, but may be missing from the intermediate frames of the listed range.
-- Correct incorrect labels using the *Modify Labels and Split Trajectories* section. Type the number for the marker to change the label and select the desired label from the dropdown then click the *Rename* button. To leave a marker unlabelled, leave the dropdown menu blank (this can be cleared by clicking the 'x').
-- If a trajectory switches between two markers, it can be split in the *Modify Labels and Split Trajectories* section. Enter the marker number and the frame you wish to split it at and click *Split*. A new marker will be added containing the trajectory of that marker from the split frame onwards.
-- Export a labelled version of the .c3d file by clicking the *Export to C3D* button. This will rotate the data back to the original orientation and fill small gaps through cubic spline interpolation. Unlablled markers will not be exported.
-- Before loading a new c3d file, click the *Refresh Settings* button.
 
 ### Transfer Learning
 - As data is collected, labelled, and corrected, it can be added to the training set through transfer learning to improve the algorithm
