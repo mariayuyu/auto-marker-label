@@ -14,7 +14,7 @@ Run this command in the Anaconda Prompt:
 conda env create -f label_env.yml
 ```
 
-You can now activate the environment you wish in order to run the corresponding scripts.
+You can now activate the environment in order to run the corresponding scripts.
 ```conda activate label_env```
 
 If you do not wish to use the YAML file, here are the required steps and packages to start using a conda virtual environment:
