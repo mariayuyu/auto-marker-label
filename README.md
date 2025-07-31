@@ -1,5 +1,5 @@
 # Automatically Labeling MoCap 
-This project is used to clean up noisy raw C3D file and label it with the standard 85 marker layout. 
+This project is used to train a labeling model, clean up noisy raw C3D file and label it with the standard 85 marker layout. 
 Implementation of: 
 
 A. L. Clouthier, G. B. Ross, M. P. Mavor, I. Coll, A. Boyle and R. B. Graham, "Development and Validation of a Deep Learning Algorithm and Open-Source Platform for the Automatic Labelling of Motion Capture Markers," in IEEE Access, doi: 10.1109/ACCESS.2021.3062748.
@@ -49,7 +49,7 @@ Packages for **preprocessing, labeling, training**:
 
 
 ## Preprocessing 
-In the `Preprocessing` folder, you will find `cleanup_raw_c3d.py` file. This file is used to disconnect particles, denoise particles, and track them in order to end up with a clean C3D file. 
+**`cleanup_raw_c3d.py`**: This file is used to disconnect particles, denoise particles, and track them in order to end up with a clean C3D file. 
 
 In order to run the script, change the name of the `subject` folder (e.g. Subj_50), and `input_file` (e.g. 2-limb_02_1). 
 You can also modify the parameters for denoising and tracking. In particular, `distance` parameter should be modified according to the action performed by the participant. If the number of resulting markers exceeds 255, `distance` will be tuned automatically. 
@@ -60,9 +60,9 @@ You can also modify the parameters for denoising and tracking. In particular, `d
 
 **[https://keeper.mpdl.mpg.de/d/c85ed3975bd64ac0864b/]**
 
-**Replace the `data` folder in `label` with `data` folder downloaded through the link above**
+**Replace the `data` folder with `data` folder downloaded through the link above**
 
-The `label` folder contains all the necessary files for the GUI and labeling. No modification or tuning is required. 
+**`markerLabelGUI.py`**, **`automarkerlabel.py`**: No modification or tuning is required. 
 
 Follow the steps below to get started! 
 
