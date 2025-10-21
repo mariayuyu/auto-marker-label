@@ -120,15 +120,16 @@ def disconnect_particles(Position, Visibility):
 
 def denoise_particles(Positions, T_appearance, T_disappearance,
                       duration_cutoff, distance_cutoff, max_abs_y,
-                      max_dxy=1000, max_dz=1500):
-    # --- Remove particles that are too short ---
-    durations = T_disappearance - T_appearance
-    keep_indices = durations > duration_cutoff
-    print(f'{np.sum(~keep_indices)} particles removed because they were too short')
-    
-    Positions = Positions[keep_indices]
-    T_appearance = T_appearance[keep_indices]
-    T_disappearance = T_disappearance[keep_indices]
+                      max_dxy=1000, max_dz=1500, remove_short = False):
+    if remove_short:
+        # --- Remove particles that are too short ---
+        durations = T_disappearance - T_appearance
+        keep_indices = durations > duration_cutoff
+        print(f'{np.sum(~keep_indices)} particles removed because they were too short')
+        
+        Positions = Positions[keep_indices]
+        T_appearance = T_appearance[keep_indices]
+        T_disappearance = T_disappearance[keep_indices]
 
     # --- Sort by duration (shortest first) ---
     durations = T_disappearance - T_appearance
@@ -148,7 +149,7 @@ def denoise_particles(Positions, T_appearance, T_disappearance,
 
         diff = others - pos[None, :, :]
         dist = np.sqrt(np.sum(diff**2, axis=2))
-        min_dist = np.min(dist, axis=0)
+        min_dist = np.nanmin(dist, axis=0)
 
         mask = min_dist < distance_cutoff
         Positions[nb, t_start:t_end][mask] = 0
@@ -156,63 +157,29 @@ def denoise_particles(Positions, T_appearance, T_disappearance,
 
     print(f'{nb_timepoints_removed} timepoints removed due to proximity to other particles')
 
-    # --- Remove particles completely zeroed out ---
-    nonzero_mask = np.any(Positions != 0, axis=(1, 2))
-    Positions = Positions[nonzero_mask]
-    T_appearance = T_appearance[nonzero_mask]
-    T_disappearance = T_disappearance[nonzero_mask]
 
-    # --- Remove particles outside forceplate area ---
-    forceplate_mask = np.array([
-        np.nanmax(np.abs(pos[:, 1])) < max_abs_y for pos in Positions
-    ])
-    print(f'{np.sum(~forceplate_mask)} particles removed for being outside forceplates')
-
-    Positions = Positions[forceplate_mask]
-    T_appearance = T_appearance[forceplate_mask]
-    T_disappearance = T_disappearance[forceplate_mask]
-
-    # --- Compute per-frame center ---
-    Positions = np.array(Positions)
-    n_frames = Positions.shape[1]
-    centers = []
-    for t in range(n_frames):
-        pts_t = Positions[:, t, :]
-        valid = ~np.isnan(pts_t).any(axis=1) & ~(pts_t == 0).all(axis=1)
-        if np.any(valid):
-            centers.append(np.mean(pts_t[valid], axis=0))
-        else:
-            centers.append(np.full(3, np.nan))
-    centers = np.stack(centers)
+    # --- When particles are outside the forceplate area, their position is set to nan ---
+    outside_forceplates = np.abs(Positions[:,:,1]) > max_abs_y
+    Positions[outside_forceplates] = np.nan
+    print(f'{np.sum(np.any(outside_forceplates, axis = 1))} particles truncated because they were outside the forceplates')
+    
+    # --- Remove particles which are completely invisble ---
+    non_nan_mask    = np.any(1 - np.isnan(Positions), axis=(1, 2))
+    Positions       = Positions[non_nan_mask]
+    
+    print(f'{np.sum(1- non_nan_mask)} particles removed for being fully invisible')
 
     # --- Remove particles too far from center (axis-specific thresholds) ---
-    final_positions = []
-    removed_far = 0
-    for i in range(len(Positions)):
-        t_start = int(T_appearance[i])
-        t_end = int(T_disappearance[i])
-        pos = Positions[i, t_start:t_end]
-        ctr = centers[t_start:t_end]
+    center               = np.nanmean(Positions, axis = 0)
+    difference_to_center = Positions - np.array([center])
+    abs_mean_diffs       = np.abs(np.nanmean(difference_to_center, axis=1))
+    keep_indices         = (abs_mean_diffs[:,0] < max_dxy)*(abs_mean_diffs[:,1] < max_dxy)*(abs_mean_diffs[:,2] < max_dz)
+    Positions            = Positions[keep_indices]
 
-        valid = ~np.isnan(pos).any(axis=1) & ~np.isnan(ctr).any(axis=1)
-        if not np.any(valid):
-            removed_far += 1
-            continue
-
-        diffs = np.abs(pos[valid] - ctr[valid])
-        mean_diffs = np.mean(diffs, axis=0)  # shape (3,): [mean_x_diff, mean_y_diff, mean_z_diff]
-
-        if (mean_diffs[0] < max_dxy and
-            mean_diffs[1] < max_dxy and
-            mean_diffs[2] < max_dz):
-            final_positions.append(Positions[i])
-        else:
-            removed_far += 1
-
-    print(f"{removed_far} particles removed for being too far from framewise center")
+    print(f"{np.sum(1-keep_indices)} particles removed for being too far from framewise center")
 
 
-    return np.array(final_positions)
+    return Positions
 
     
 def tracking(Positions, memory, distance, span):
@@ -324,14 +291,13 @@ if __name__ == "__main__":
 
     print('Denoising particles')
     Positions = denoise_particles(Positions, T_appearance, T_disappearance, duration_cutoff, distance_cutoff, max_abs_y)
-    output_path = f"data/{subject}/{input_file}_cleaned.c3d"
     
     print("Positions after denoising:", Positions.shape)
     
     print('Tracking')
     # Tuning distance parameter
     nb_markers = 1000
-    while nb_markers > 180:   
+    while nb_markers > 255:   
         print("distance: ", distance)
         Positions, Visibility = tracking(Positions, memory, distance, span)
         print("Positions after tracking:", Positions.shape)
