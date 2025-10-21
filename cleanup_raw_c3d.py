@@ -16,7 +16,7 @@ max_abs_y       = 1000 # mm, if the absolute y position of a marker is larger th
 
 # Tracking parameters
 memory   = 100 # number of frames for which a marker is kept in memory after it disappears
-distance = 5   # maximum distance that a marker can travel in 1 timeframe (5 for static, around 16 for walking)
+distance = 15   # maximum distance that a marker can travel in 1 timeframe (5 for static, around 16 for walking)
 span     = 10  # Compute velocity from the most recent span+1 frames
 
 # Subject name and file name that you want preprocessed 
